@@ -15,7 +15,7 @@ import { buildTree, pqAddress, sign, treeRoot, type PqSignature, type Tree } fro
 export type SchemeKey = { scheme: SchemeId; public_key: string; binding: PqSignature };
 export type SchemeKeys = { secretKey: Uint8Array; publicKey: string; binding: PqSignature };
 
-export type LeafUse = { leaf_index: number; purpose: "genesis" | "launch" | "proof" | "bind"; ref: string | null; used_at: string };
+export type LeafUse = { leaf_index: number; purpose: "genesis" | "launch" | "proof" | "bind" | "transfer"; ref: string | null; used_at: string };
 
 export type RemoteIdentity = {
   id: string;

@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/", label: "Coins" },
   { href: "/launch", label: "Launch" },
   { href: "/identity", label: "Identity" },
+  { href: "/wallet", label: "Wallet" },
   { href: "/prove", label: "Verify" },
   { href: "/docs", label: "Docs" },
 ];

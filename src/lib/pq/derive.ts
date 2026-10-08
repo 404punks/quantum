@@ -49,3 +49,13 @@ export function deriveMintKeypair(skSeed: Uint8Array, leaf: number) {
   new DataView(info.buffer).setUint32(0, leaf);
   return Keypair.fromSeed(hkdf(sha256, skSeed, utf8ToBytes("pqc.market/mint/v1"), info, 32));
 }
+
+/**
+ * Each wallet index owns an ed25519 keypair derived from the identity seed.
+ * Never stored anywhere; re-derived in the browser after unlock, like mint keys.
+ */
+export function deriveVaultKeypair(skSeed: Uint8Array, index: number) {
+  const info = new Uint8Array(4);
+  new DataView(info.buffer).setUint32(0, index);
+  return Keypair.fromSeed(hkdf(sha256, skSeed, utf8ToBytes("pqc.market/wallet/v1"), info, 32));
+}

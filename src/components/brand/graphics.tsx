@@ -7,7 +7,9 @@ import { AddrType, W, address, digits, leafHash, secretElement, thash } from "@/
 import { nodeHash } from "@/lib/pq/xmss";
 import { launchDigest } from "@/lib/pq/messages";
 import { MONO, SANS, SERIF } from "./fonts";
-import { MoreSchemesTweet, SchemesTweet } from "./schemes-graphic";
+import { AllSchemesTweet, MoreSchemesTweet, SceneAllSchemesTweet, SchemesTweet } from "./schemes-graphic";
+import { WalletsFingerprintScene, WalletsFingerprintTweet, WalletsLaunchScene, WalletsLaunchTweet } from "./wallet-graphics";
+import { SceneAvatar, SceneBunkerMode, SceneHeader, SceneIntro, ScenePortrait, SceneProof, SceneSquare } from "./scene-graphics";
 
 /**
  * Brand graphics in the site's own visual language: serif headline with an
@@ -17,29 +19,30 @@ import { MoreSchemesTweet, SchemesTweet } from "./schemes-graphic";
  */
 
 
-const BG = "#121110";
-const SURFACE = "#1a1918";
-const TERM = "#0b0a0a";
-const LINE = "#2a2725";
-const LINE_STRONG = "#3a3633";
-const FG = "#f2eee9";
-const MUTED = "#a8a19a";
-const DIM = "#77706a";
-const GREEN = "#3fb950";
-const AMBER = "#e3b341";
-const RED = "#f2555a";
+export const BG = "#121110";
+export const SURFACE = "#1a1918";
+export const TERM = "#0b0a0a";
+export const LINE = "#2a2725";
+export const LINE_STRONG = "#3a3633";
+export const FG = "#f2eee9";
+export const MUTED = "#a8a19a";
+export const DIM = "#77706a";
+export const GREEN = "#3fb950";
+export const AMBER = "#e3b341";
+export const RED = "#f2555a";
 
-const NOISE =
+export const NOISE =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
 /* ------------------------------------------------------------------ */
 /* Primitives                                                          */
 /* ------------------------------------------------------------------ */
 
-export function Frame({ w, h, children }: { w: number; h: number; children: ReactNode }) {
+export function Frame({ w, h, children, plain }: { w: number; h: number; children: ReactNode; plain?: boolean }) {
   return (
     <div style={{ width: w, height: h, position: "relative", overflow: "hidden", background: BG, color: FG, fontFamily: SANS }}>
-      {/* faint engineering grid */}
+      {/* faint engineering grid (omitted when artwork fills the frame) */}
+      {!plain && (
       <div
         style={{
           position: "absolute",
@@ -49,13 +52,14 @@ export function Frame({ w, h, children }: { w: number; h: number; children: Reac
           backgroundPosition: "-1px -1px",
         }}
       />
+      )}
       {children}
       <div style={{ position: "absolute", inset: 0, backgroundImage: NOISE, opacity: 0.14, mixBlendMode: "overlay", pointerEvents: "none" }} />
     </div>
   );
 }
 
-function Headline({ size, children, style }: { size: number; children: ReactNode; style?: CSSProperties }) {
+export function Headline({ size, children, style }: { size: number; children: ReactNode; style?: CSSProperties }) {
   return (
     <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: size, lineHeight: 1.08, letterSpacing: -size * 0.02, color: FG, ...style }}>
       {children}
@@ -63,20 +67,20 @@ function Headline({ size, children, style }: { size: number; children: ReactNode
   );
 }
 
-function Accent({ children }: { children: ReactNode }) {
+export function Accent({ children }: { children: ReactNode }) {
   return <span style={{ fontStyle: "italic", color: GREEN, whiteSpace: "nowrap" }}>{children}</span>;
 }
 
-function Body({ size, children, style }: { size: number; children: ReactNode; style?: CSSProperties }) {
+export function Body({ size, children, style }: { size: number; children: ReactNode; style?: CSSProperties }) {
   return <div style={{ fontFamily: SANS, fontSize: size, lineHeight: 1.55, color: MUTED, ...style }}>{children}</div>;
 }
 
-function Mono({ size, color = MUTED, children, style }: { size: number; color?: string; children: ReactNode; style?: CSSProperties }) {
+export function Mono({ size, color = MUTED, children, style }: { size: number; color?: string; children: ReactNode; style?: CSSProperties }) {
   return <div style={{ fontFamily: MONO, fontSize: size, lineHeight: 1.6, color, ...style }}>{children}</div>;
 }
 
 /** Logo + serif wordmark, exactly like the navbar. */
-function Wordmark({ size = 30 }: { size?: number }) {
+export function Wordmark({ size = 30 }: { size?: number }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: size * 0.42 }}>
       <img src="/logo-mark.png" alt="" style={{ width: size * 1.45, height: size * 1.45 }} />
@@ -86,7 +90,7 @@ function Wordmark({ size = 30 }: { size?: number }) {
 }
 
 /** Top bar shared by the large formats. */
-function TopBar({ pad, right = "post-quantum launchpad" }: { pad: number; right?: string }) {
+export function TopBar({ pad, right = "post-quantum launchpad" }: { pad: number; right?: string }) {
   return (
     <div style={{ position: "absolute", left: pad, right: pad, top: pad * 0.75, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
       <Wordmark size={30} />
@@ -97,7 +101,7 @@ function TopBar({ pad, right = "post-quantum launchpad" }: { pad: number; right?
   );
 }
 
-function Terminal({ title, meta, children, style, width }: { title: string; meta?: string; children: ReactNode; style?: CSSProperties; width?: number }) {
+export function Terminal({ title, meta, children, style, width }: { title: string; meta?: string; children: ReactNode; style?: CSSProperties; width?: number }) {
   return (
     <div style={{ width, border: `1px solid ${LINE_STRONG}`, background: TERM, boxShadow: "0 30px 80px -30px rgba(0,0,0,0.8)", fontFamily: MONO, ...style }}>
       <div style={{ display: "flex", justifyContent: "space-between", background: SURFACE, borderBottom: `1px solid ${LINE_STRONG}`, padding: "10px 18px", fontSize: 15, color: DIM }}>
@@ -109,7 +113,7 @@ function Terminal({ title, meta, children, style, width }: { title: string; meta
   );
 }
 
-function Prompt({ children }: { children: ReactNode }) {
+export function Prompt({ children }: { children: ReactNode }) {
   return (
     <div>
       <span style={{ color: GREEN }}>pqc@bunker</span>
@@ -119,7 +123,7 @@ function Prompt({ children }: { children: ReactNode }) {
   );
 }
 
-function Ok({ children, pending }: { children: ReactNode; pending?: boolean }) {
+export function Ok({ children, pending }: { children: ReactNode; pending?: boolean }) {
   return (
     <div>
       <span style={{ color: pending ? AMBER : GREEN }}>{pending ? "[ .. ]" : "[ OK ]"}</span> <span style={{ color: FG }}>{children}</span>
@@ -127,7 +131,7 @@ function Ok({ children, pending }: { children: ReactNode; pending?: boolean }) {
   );
 }
 
-function Stat({ label, value, size = 30 }: { label: string; value: string; size?: number }) {
+export function Stat({ label, value, size = 30 }: { label: string; value: string; size?: number }) {
   return (
     <div>
       <Mono size={size * 0.55} color={DIM}>
@@ -144,7 +148,7 @@ function Stat({ label, value, size = 30 }: { label: string; value: string; size?
 /* Deterministic sample data, computed with the real WOTS code.        */
 /* ------------------------------------------------------------------ */
 
-function useSample() {
+export function useSample() {
   return useMemo(() => {
     const sk = sha256(utf8ToBytes("pqc.market/brand/sk"));
     const pub = sha256(utf8ToBytes("pqc.market/brand/pub"));
@@ -166,7 +170,7 @@ function useSample() {
   }, []);
 }
 
-function ChainRows({ rows, digits: d, size = 18 }: { rows: string[][]; digits: number[]; size?: number }) {
+export function ChainRows({ rows, digits: d, size = 18 }: { rows: string[][]; digits: number[]; size?: number }) {
   return (
     <div style={{ fontSize: size }}>
       {rows.map((vals, i) => (
@@ -186,7 +190,7 @@ function ChainRows({ rows, digits: d, size = 18 }: { rows: string[][]; digits: n
   );
 }
 
-function DigestCells({ digits: d, cell, gap, cols = 34 }: { digits: number[]; cell: number; gap: number; cols?: number }) {
+export function DigestCells({ digits: d, cell, gap, cols = 34 }: { digits: number[]; cell: number; gap: number; cols?: number }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, ${cell}px)`, gap }}>
       {d.map((v, i) => (
@@ -524,6 +528,11 @@ export function ProfilePicture() {
 export type Graphic = { id: string; title: string; note: string; w: number; h: number; group: string; Component: () => ReactNode };
 
 export const GRAPHICS: Graphic[] = [
+  { id: "wallets-launch", title: "Post-quantum wallets", note: "Wallet launch", w: 1600, h: 900, group: "Wallets", Component: WalletsLaunchTweet },
+  { id: "wallets-launch-bunker", title: "Post-quantum wallets · bunker", note: "Artwork edition", w: 1600, h: 900, group: "Wallets", Component: WalletsLaunchScene },
+  { id: "wallets-fingerprint", title: "Every wallet has a fingerprint", note: "Wallet cards", w: 1600, h: 900, group: "Wallets", Component: WalletsFingerprintTweet },
+  { id: "wallets-fingerprint-bunker", title: "Every wallet has a fingerprint · bunker", note: "Artwork edition", w: 1600, h: 900, group: "Wallets", Component: WalletsFingerprintScene },
+  { id: "all-schemes", title: "All eight schemes", note: "WOTS · ML-DSA ×2 · SLH-DSA ×2 · Falcon ×2 · hybrid", w: 1600, h: 900, group: "Tweets · 16:9", Component: AllSchemesTweet },
   { id: "more-schemes", title: "Four more schemes", note: "ML-DSA-87 · SLH-DSA-SHAKE · Falcon-1024 · hybrid", w: 1600, h: 900, group: "Tweets · 16:9", Component: MoreSchemesTweet },
   { id: "schemes", title: "Signature schemes", note: "WOTS · ML-DSA · SLH-DSA · Falcon", w: 1600, h: 900, group: "Tweets · 16:9", Component: SchemesTweet },
   { id: "intro", title: "Introduction", note: "Launch announcement", w: 1600, h: 900, group: "Tweets · 16:9", Component: IntroTweet },
@@ -533,6 +542,14 @@ export const GRAPHICS: Graphic[] = [
   { id: "fingerprint", title: "Quantum fingerprint", note: "Digest grid", w: 1080, h: 1080, group: "Square & portrait", Component: FingerprintSquare },
   { id: "numbers", title: "By the numbers", note: "Stats", w: 1080, h: 1080, group: "Square & portrait", Component: NumbersSquare },
   { id: "versus", title: "Which one survives?", note: "ed25519 vs WOTS", w: 1080, h: 1350, group: "Square & portrait", Component: VersusPortrait },
+  { id: "scene-all-schemes", title: "All eight schemes · bunker", note: "Artwork edition", w: 1600, h: 900, group: "Bunker artwork", Component: SceneAllSchemesTweet },
+  { id: "scene-intro", title: "Introduction · bunker", note: "Artwork edition", w: 1600, h: 900, group: "Bunker artwork", Component: SceneIntro },
+  { id: "scene-bunker-mode", title: "Bunker mode · bunker", note: "Artwork edition", w: 1600, h: 900, group: "Bunker artwork", Component: SceneBunkerMode },
+  { id: "scene-proof", title: "The proof · bunker", note: "Artwork edition", w: 1600, h: 900, group: "Bunker artwork", Component: SceneProof },
+  { id: "scene-square", title: "Quantum fingerprint · bunker", note: "Artwork edition", w: 1080, h: 1080, group: "Bunker artwork", Component: SceneSquare },
+  { id: "scene-portrait", title: "Seal your coins", note: "Artwork edition", w: 1080, h: 1350, group: "Bunker artwork", Component: ScenePortrait },
+  { id: "scene-header", title: "X header · bunker", note: "Artwork edition", w: 1500, h: 500, group: "Bunker artwork", Component: SceneHeader },
+  { id: "scene-avatar", title: "Avatar · bunker", note: "Artwork edition", w: 400, h: 400, group: "Bunker artwork", Component: SceneAvatar },
   { id: "x-header", title: "X header", note: "Profile banner", w: 1500, h: 500, group: "Profile", Component: XHeader },
   { id: "pfp", title: "Profile picture", note: "Avatar", w: 400, h: 400, group: "Profile", Component: ProfilePicture },
 ];

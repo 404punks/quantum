@@ -4,9 +4,10 @@ import { useEffect, useState, type ReactNode } from "react";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, concatBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import { launchDigest } from "@/lib/pq/messages";
-import { SCHEMES, SCHEME_IDS_V1, SCHEME_IDS_V2, deriveSchemeKeys, schemeSign, schemeVerify, type SchemeId } from "@/lib/pq/schemes";
+import { SCHEMES, SCHEME_IDS, SCHEME_IDS_V1, SCHEME_IDS_V2, deriveSchemeKeys, schemeSign, schemeVerify, type SchemeId } from "@/lib/pq/schemes";
 import * as wots from "@/lib/pq/wots";
 import { MONO, SANS, SERIF } from "./fonts";
+import { Scene, Shade } from "./scene-graphics";
 
 const BG = "#121110";
 const SURFACE = "#1a1918";
@@ -66,20 +67,30 @@ function useSignatures(ids: SchemeId[]): Row[] {
   return rows;
 }
 
-function SchemesGraphic({ ids, tag, headline, subtitle, footer }: { ids: SchemeId[]; tag: string; headline: ReactNode; subtitle: string; footer?: string }) {
+function SchemesGraphic({ ids, tag, headline, subtitle, footer, scene }: { ids: SchemeId[]; tag: string; headline: ReactNode; subtitle: string; footer?: string; scene?: boolean }) {
   const rows = useSignatures(ids);
   const max = Math.max(...rows.map((r) => r.bytes));
+  const compact = ids.length > 4;
   return (
     <div style={{ width: 1600, height: 900, position: "relative", overflow: "hidden", background: BG, color: FG, fontFamily: SANS }}>
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage: `linear-gradient(${LINE}55 1px, transparent 1px), linear-gradient(90deg, ${LINE}55 1px, transparent 1px)`,
-          backgroundSize: "80px 80px",
-          backgroundPosition: "-1px -1px",
-        }}
-      />
+      {scene ? (
+        <>
+          {/* Hatch sits in the headline band on the right; the card area fades to near-black so eight terminals stay legible. */}
+          <Scene w={1600} h={900} free={{ width: 1010, left: 790, top: -52 }} />
+          <Shade style={{ background: "linear-gradient(90deg, rgba(18,17,16,1) 0%, rgba(18,17,16,1) 52%, rgba(18,17,16,0.72) 61%, rgba(18,17,16,0.25) 70%, rgba(18,17,16,0.06) 80%, rgba(18,17,16,0.05) 100%)" }} />
+          <Shade style={{ background: "linear-gradient(180deg, rgba(18,17,16,0.55) 0%, rgba(18,17,16,0.08) 16%, rgba(18,17,16,0.05) 30%, rgba(18,17,16,0.9) 37%, rgba(18,17,16,1) 46%, rgba(18,17,16,1) 100%)" }} />
+        </>
+      ) : (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: `linear-gradient(${LINE}55 1px, transparent 1px), linear-gradient(90deg, ${LINE}55 1px, transparent 1px)`,
+            backgroundSize: "80px 80px",
+            backgroundPosition: "-1px -1px",
+          }}
+        />
+      )}
 
       <div style={{ position: "absolute", left: 96, right: 96, top: 72, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
@@ -89,38 +100,40 @@ function SchemesGraphic({ ids, tag, headline, subtitle, footer }: { ids: SchemeI
         <span style={{ fontFamily: MONO, fontSize: 18, color: GREEN }}>● {tag}</span>
       </div>
 
-      <div style={{ position: "absolute", left: 96, right: 96, top: 175 }}>
-        <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 76, lineHeight: 1.08, letterSpacing: -1.5 }}>{headline}</div>
-        <div style={{ marginTop: 20, fontSize: 24, color: MUTED }}>{subtitle}</div>
+      <div style={{ position: "absolute", left: 96, right: 96, top: compact ? 150 : 175 }}>
+        <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: compact ? 64 : 76, lineHeight: 1.08, letterSpacing: -1.5 }}>{headline}</div>
+        <div style={{ marginTop: compact ? 14 : 20, fontSize: compact ? 21 : 24, color: MUTED }}>{subtitle}</div>
       </div>
 
-      <div style={{ position: "absolute", left: 96, right: 96, top: 400, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
+      <div style={{ position: "absolute", left: 96, right: 96, top: compact ? 318 : 400, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: compact ? 16 : 20 }}>
         {rows.map((r) => {
           const s = SCHEMES[r.id];
           return (
-            <div key={r.id} style={{ border: `1px solid ${LINE_STRONG}`, background: TERM, fontFamily: MONO, boxShadow: "0 30px 80px -30px rgba(0,0,0,0.8)" }}>
+            <div key={r.id} style={{ border: `1px solid ${LINE_STRONG}`, background: scene ? "rgba(11,10,10,0.92)" : TERM, fontFamily: MONO, boxShadow: "0 30px 80px -30px rgba(0,0,0,0.8)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", background: SURFACE, borderBottom: `1px solid ${LINE_STRONG}`, padding: "9px 16px", fontSize: 14, color: DIM }}>
                 <span>{s.standard}</span>
                 <span>{r.id === "wots" ? "root" : "certified"}</span>
               </div>
-              <div style={{ padding: "20px 18px 22px" }}>
-                <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: s.name.length > 14 ? 24 : 30, letterSpacing: -0.6, color: FG, whiteSpace: "nowrap", lineHeight: "36px" }}>
+              <div style={{ padding: compact ? "14px 16px 16px" : "20px 18px 22px" }}>
+                <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: s.name.length > 14 ? (compact ? 21 : 24) : compact ? 25 : 30, letterSpacing: -0.6, color: FG, whiteSpace: "nowrap", lineHeight: compact ? "30px" : "36px" }}>
                   {s.name}
                 </div>
-                <div style={{ marginTop: 6, fontSize: 15, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div style={{ marginTop: compact ? 3 : 6, fontSize: compact ? 13 : 15, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {s.aka} · {s.family.split(" · ")[0]}
                 </div>
 
-                <div style={{ marginTop: 22, fontSize: 13, color: DIM }}>signature</div>
+                <div style={{ marginTop: compact ? 12 : 22, fontSize: 13, color: DIM }}>signature</div>
                 <div style={{ marginTop: 6, height: 8, background: LINE }}>
                   <div style={{ height: 8, width: `${Math.max(4, (r.bytes / max) * 100)}%`, background: GREEN }} />
                 </div>
-                <div style={{ marginTop: 8, fontSize: 22, color: FG }}>{r.bytes.toLocaleString()} B</div>
+                <div style={{ marginTop: 8, fontSize: compact ? 19 : 22, color: FG }}>{r.bytes.toLocaleString()} B</div>
 
-                <div style={{ marginTop: 18, fontSize: 13, lineHeight: 1.55, color: DIM, wordBreak: "break-all", height: 62, overflow: "hidden" }}>
-                  {r.sig ? `σ = 0x${r.sig.slice(0, 84)}…` : "σ = signing…"}
-                </div>
-                <div style={{ marginTop: 14, fontSize: 15 }}>
+                {!compact && (
+                  <div style={{ marginTop: 18, fontSize: 13, lineHeight: 1.55, color: DIM, wordBreak: "break-all", height: 62, overflow: "hidden" }}>
+                    {r.sig ? `σ = 0x${r.sig.slice(0, 84)}…` : "σ = signing…"}
+                  </div>
+                )}
+                <div style={{ marginTop: compact ? 10 : 14, fontSize: compact ? 14 : 15 }}>
                   {r.ok === null ? (
                     <span style={{ color: DIM }}>[ .. ] verifying</span>
                   ) : (
@@ -155,6 +168,37 @@ export function SchemesTweet() {
         </>
       }
       subtitle="Four post-quantum schemes. One identity. Every key certified by your hash-based root."
+    />
+  );
+}
+
+export function AllSchemesTweet() {
+  return (
+    <SchemesGraphic
+      ids={SCHEME_IDS}
+      tag="eight post-quantum schemes"
+      headline={
+        <>
+          Eight ways to sign. One <span style={{ fontStyle: "italic", color: GREEN, whiteSpace: "nowrap" }}>identity</span>.
+        </>
+      }
+      subtitle="Hash-based, lattice, NTRU and hybrid — every key certified by your WOTS root, every signature verified in the browser."
+    />
+  );
+}
+
+export function SceneAllSchemesTweet() {
+  return (
+    <SchemesGraphic
+      scene
+      ids={SCHEME_IDS}
+      tag="eight post-quantum schemes"
+      headline={
+        <>
+          Eight ways to sign. One <span style={{ fontStyle: "italic", color: GREEN, whiteSpace: "nowrap" }}>identity</span>.
+        </>
+      }
+      subtitle="Hash-based, lattice, NTRU and hybrid. Every key certified by your WOTS root."
     />
   );
 }

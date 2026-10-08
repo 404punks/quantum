@@ -59,7 +59,7 @@ export async function nextFreeLeaf(identityId: string) {
 export async function burnLeaf(row: {
   identity_id: string;
   leaf_index: number;
-  purpose: "genesis" | "launch" | "proof" | "bind";
+  purpose: "genesis" | "launch" | "proof" | "bind" | "transfer";
   message_hash: string;
   ref?: string;
 }) {

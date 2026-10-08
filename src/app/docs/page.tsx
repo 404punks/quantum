@@ -21,6 +21,7 @@ const TOC: TocItem[] = [
   { id: "fees", label: "Creator fees", sub: true },
   { id: "schemes", label: "Signature schemes" },
   { id: "proofs", label: "Proof of possession" },
+  { id: "wallets", label: "Wallets" },
   { id: "security", label: "Security analysis" },
   { id: "parameters", label: "Parameters" },
   { id: "verify-yourself", label: "Verify it yourself" },
@@ -289,6 +290,28 @@ export default function Page() {
             <P>
               The leaf ledger&apos;s primary key <Code>(identity_id, leaf_index)</Code> makes one-time use a database invariant; the
               challenge is consumed even on failure, so a nonce cannot be retried.
+            </P>
+          </Section>
+
+          <Section id="wallets" title="Wallets">
+            <P>
+              A pqc.market wallet is an ed25519 keypair derived from the identity seed (<Code>HKDF(sk.seed, &quot;pqc.market/wallet/v1&quot;, index)</Code>),
+              re-derived in the browser after unlock and never stored. Registration is a statement signed by the derived key itself, so the
+              server only ever holds public addresses.
+            </P>
+            <P>
+              Every transfer is <B>dual-signed</B>: the derived key signs the Solana transaction (what the chain enforces), and a post-quantum
+              key signs a transfer digest whose hash rides along in an SPL memo. Rotating a wallet sweeps everything to a freshly derived
+              address and retires the old one.
+            </P>
+            <Formula>d = SHA-256(&quot;pqc.market/transfer/v1
+&quot; ‖ amount ‖ from ‖ mint ‖ nonce ‖ to ‖ leaf | scheme)</Formula>
+            <P>
+              <B>Be clear about the boundary.</B> Solana still enforces only the ed25519 signature on-chain. The post-quantum half is a
+              quantum-proof <Em>record of authorization</Em>: after a curve break it lets an owner prove which transfers they signed and which
+              were forged, but it does not stop a forged transfer from executing. Holding value under hash-based keys needs an on-chain
+              verifier program, a Winternitz vault whose spends require a WOTS signature checked by the program. That is the next step on the
+              roadmap and the reason these wallets are labelled identity-derived rather than quantum-secured.
             </P>
           </Section>
 

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { VersionedTransaction } from "@solana/web3.js";
 import { Anchor, ArrowUpRight, Check, Fingerprint, KeyRound, Loader2, Lock, LockOpen, ShieldCheck } from "lucide-react";
 import { anchorMemo } from "@/lib/pq/messages";
@@ -29,7 +30,15 @@ export function IdentityView() {
 }
 
 function IdentityBody() {
-  const { unlocked } = useIdentity();
+  const { unlocked, remote } = useIdentity();
+  const router = useRouter();
+  const next = useSearchParams().get("next");
+  // Pages that need unlocked keys (e.g. /wallet) send people here with ?next=; return once ready.
+  // Only internal paths are honoured, so this cannot be used as an open redirect.
+  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+  useEffect(() => {
+    if (unlocked && remote && safeNext) router.replace(safeNext);
+  }, [unlocked, remote, safeNext, router]);
   return unlocked ? <IdentityDetails /> : <UnlockPanel />;
 }
 

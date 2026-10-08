@@ -79,3 +79,27 @@ export function anchorMemo(pqAddress: string, root: string) {
 }
 
 export const hex = bytesToHex;
+
+/** Signed by a derived wallet's own ed25519 key to prove the client holds it. */
+export function walletStatement(p: { pqAddress: string; index: number; address: string }) {
+  return [`${DOMAIN} — Register Post-Quantum Wallet`, "", `PQ address: ${p.pqAddress}`, `Index: ${p.index}`, `Wallet: ${p.address}`].join("\n");
+}
+
+/** What the post-quantum key signs for a transfer. `mint`/`amount` are "ALL" for a rotate. */
+export function transferDigest(f: {
+  from: string;
+  to: string;
+  mint: string;
+  amount: string;
+  nonce: string;
+  leaf?: number | null;
+  scheme?: string | null;
+}) {
+  const base = { from: f.from, to: f.to, mint: f.mint, amount: f.amount, nonce: f.nonce };
+  return f.scheme && f.scheme !== "wots" ? digest("transfer", { ...base, scheme: f.scheme }) : digest("transfer", { ...base, leaf: f.leaf ?? 0 });
+}
+
+/** On-chain memo carried by every dual-signed transfer. */
+export function transferMemo(pqAddress: string, scheme: string, messageHash: string) {
+  return `${DOMAIN}:v${VERSION}:transfer:${pqAddress}:${scheme}:${messageHash}`;
+}
