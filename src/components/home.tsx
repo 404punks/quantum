@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import type { LaunchItem, MarketItem } from "@/lib/types";
 import { cn } from "@/lib/format";
@@ -73,17 +73,50 @@ function CoinsSection() {
   const [market, setMarket] = useState<Record<string, MarketItem> | null>(null);
   const [sort, setSort] = useState<Sort>("new");
   const [status, setStatus] = useState<Status>("all");
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Graduation is filtered on the server across every live launch, not just the loaded page.
+  const listUrl = useCallback(
+    (offset: number) => `/api/launches?offset=${offset}${status === "graduated" ? "&status=graduated" : ""}`,
+    [status],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/launches")
+    setLaunches(null);
+    setMarket(null);
+    setHasMore(false);
+    fetch(listUrl(0))
       .then((r) => r.json())
-      .then((j) => !cancelled && setLaunches(j.launches ?? []))
+      .then((j) => {
+        if (cancelled) return;
+        setLaunches(j.launches ?? []);
+        setHasMore(Boolean(j.hasMore));
+      })
       .catch(() => !cancelled && setLaunches([]));
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [listUrl]);
+
+  async function loadMore() {
+    if (!launches || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const j = await fetch(listUrl(launches.length)).then((r) => r.json());
+      setLaunches((prev) => {
+        const seen = new Set((prev ?? []).map((l) => l.mint));
+        return [...(prev ?? []), ...((j.launches ?? []) as LaunchItem[]).filter((l) => !seen.has(l.mint))];
+      });
+      setHasMore(Boolean(j.hasMore));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   // Supabase Realtime: RLS only streams rows once status = live, i.e. when submit confirms.
   useEffect(() => {
@@ -113,6 +146,7 @@ function CoinsSection() {
           hardened: false,
           anchored: false,
         };
+        if (statusRef.current !== "all") return;
         setLaunches((prev) => (prev && !prev.some((l) => l.mint === item.mint) ? [item, ...prev] : prev));
         setFresh((prev) => new Set(prev).add(item.mint));
         timers.push(
@@ -139,10 +173,12 @@ function CoinsSection() {
       return;
     }
     let cancelled = false;
+    const list = mints.split(",");
+    const chunks: string[][] = [];
+    for (let i = 0; i < list.length; i += 48) chunks.push(list.slice(i, i + 48));
     const load = () =>
-      fetch(`/api/market?mints=${mints}`)
-        .then((r) => r.json())
-        .then((j) => !cancelled && setMarket(j.tokens ?? {}))
+      Promise.all(chunks.map((c) => fetch(`/api/market?mints=${c.join(",")}`).then((r) => r.json())))
+        .then((rs) => !cancelled && setMarket(Object.assign({}, ...rs.map((j) => j.tokens ?? {}))))
         .catch(() => !cancelled && setMarket((m) => m ?? {}));
     void load();
     const timer = setInterval(load, 20_000);
@@ -155,7 +191,7 @@ function CoinsSection() {
   const visible = useMemo(() => {
     if (!launches) return null;
     const m = market ?? {};
-    const list = status === "graduated" ? launches.filter((l) => m[l.mint]?.curve?.complete) : [...launches];
+    const list = [...launches];
     const key: Record<Exclude<Sort, "new">, (x: MarketItem | undefined) => number> = {
       mcap: (x) => x?.marketCap ?? -1,
       volume: (x) => x?.volume24h ?? -1,
@@ -164,7 +200,7 @@ function CoinsSection() {
     // "new" keeps the server's launched_at desc order.
     if (sort !== "new") list.sort((a, b) => key[sort](m[b.mint]) - key[sort](m[a.mint]));
     return list;
-  }, [launches, market, status, sort]);
+  }, [launches, market, sort]);
 
   return (
     <section className="min-h-[110vh] pb-24">
@@ -214,6 +250,17 @@ function CoinsSection() {
           {visible.map((l) => (
             <CoinCard key={l.mint} launch={l} market={market?.[l.mint]} marketLoading={market === null} fresh={fresh.has(l.mint)} />
           ))}
+        </div>
+      )}
+      {hasMore && visible && visible.length > 0 && (
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={() => void loadMore()}
+            disabled={loadingMore}
+            className="cursor-pointer rounded-md border border-line bg-surface px-5 py-2.5 text-[13px] text-fg transition-colors hover:border-line-strong hover:bg-surface-2 disabled:opacity-50"
+          >
+            {loadingMore ? "Loading…" : "Load more coins"}
+          </button>
         </div>
       )}
     </section>
