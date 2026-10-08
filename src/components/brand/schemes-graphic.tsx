@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, concatBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import { launchDigest } from "@/lib/pq/messages";
-import { SCHEMES, SCHEME_IDS, deriveSchemeKeys, schemeSign, schemeVerify, type SchemeId } from "@/lib/pq/schemes";
+import { SCHEMES, SCHEME_IDS_V1, SCHEME_IDS_V2, deriveSchemeKeys, schemeSign, schemeVerify, type SchemeId } from "@/lib/pq/schemes";
 import * as wots from "@/lib/pq/wots";
 import { MONO, SANS, SERIF } from "./fonts";
 
@@ -23,16 +23,15 @@ const NOISE =
 
 type Row = { id: SchemeId; sig: string | null; bytes: number; ok: boolean | null };
 
-const placeholder = (): Row[] => SCHEME_IDS.map((id) => ({ id, sig: null, bytes: SCHEMES[id].sigBytes, ok: null }));
-
 /**
- * Real signatures over one launch digest, one scheme at a time. SLH-DSA alone
- * costs ~1 s of CPU, so this never runs during render or SSR: it starts after
- * mount, yields between schemes, and is computed once per page load.
+ * Real signatures over one launch digest. Some schemes cost up to ~1 s of CPU,
+ * so nothing runs during render or SSR: work starts after mount, one scheme
+ * per macrotask, and each result is cached for the page's lifetime.
  */
-let computed: Promise<Row[]> | null = null;
+const cache = new Map<SchemeId, Promise<Row>>();
 
-async function signOne(id: SchemeId, skSeed: Uint8Array): Promise<Row> {
+async function signOne(id: SchemeId): Promise<Row> {
+  const skSeed = sha256(utf8ToBytes("pqc.market/brand/schemes"));
   const d = launchDigest({ mint: "pqc", creator: "brand", name: "Bunker", symbol: "BNKR", image: "logo", leaf: 7, scheme: id });
   if (id === "wots") {
     // One WOTS leaf: sign, then rebuild the public key from the signature and compare.
@@ -47,31 +46,28 @@ async function signOne(id: SchemeId, skSeed: Uint8Array): Promise<Row> {
   return { id, sig, bytes: sig.length / 2, ok: await schemeVerify(id, d, sig, bytesToHex(keys.publicKey)) };
 }
 
-function useSignatures(): Row[] {
-  const [rows, setRows] = useState<Row[]>(placeholder);
+function useSignatures(ids: SchemeId[]): Row[] {
+  const [rows, setRows] = useState<Row[]>(() => ids.map((id) => ({ id, sig: null, bytes: SCHEMES[id].sigBytes, ok: null })));
   useEffect(() => {
     let cancelled = false;
-    const apply = (done: Row[]) => !cancelled && setRows((prev) => prev.map((r) => done.find((o) => o.id === r.id) ?? r));
-    computed ??= (async () => {
-      const skSeed = sha256(utf8ToBytes("pqc.market/brand/schemes"));
-      const out: Row[] = [];
-      for (const id of SCHEME_IDS) {
+    (async () => {
+      for (const id of ids) {
         await new Promise((r) => setTimeout(r, 50)); // let the page paint between schemes
-        out.push(await signOne(id, skSeed));
-        apply(out);
+        if (cancelled) return;
+        if (!cache.has(id)) cache.set(id, signOne(id));
+        const row = await cache.get(id)!;
+        if (!cancelled) setRows((prev) => prev.map((r) => (r.id === id ? row : r)));
       }
-      return out;
     })();
-    void computed.then(apply);
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [ids]);
   return rows;
 }
 
-export function SchemesTweet() {
-  const rows = useSignatures();
+function SchemesGraphic({ ids, tag, headline, subtitle, footer }: { ids: SchemeId[]; tag: string; headline: ReactNode; subtitle: string; footer?: string }) {
+  const rows = useSignatures(ids);
   const max = Math.max(...rows.map((r) => r.bytes));
   return (
     <div style={{ width: 1600, height: 900, position: "relative", overflow: "hidden", background: BG, color: FG, fontFamily: SANS }}>
@@ -90,16 +86,12 @@ export function SchemesTweet() {
           <img src="/logo-mark.png" alt="" style={{ width: 44, height: 44 }} />
           <span style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 30, letterSpacing: -0.6 }}>pqc.market</span>
         </div>
-        <span style={{ fontFamily: MONO, fontSize: 18, color: GREEN }}>● new · signature schemes</span>
+        <span style={{ fontFamily: MONO, fontSize: 18, color: GREEN }}>● {tag}</span>
       </div>
 
-      <div style={{ position: "absolute", left: 96, top: 175 }}>
-        <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 76, lineHeight: 1.08, letterSpacing: -1.5 }}>
-          Choose how your coin is <span style={{ fontStyle: "italic", color: GREEN, whiteSpace: "nowrap" }}>signed</span>.
-        </div>
-        <div style={{ marginTop: 20, fontSize: 24, color: MUTED }}>
-          Four post-quantum schemes. One identity. Every key certified by your hash-based root.
-        </div>
+      <div style={{ position: "absolute", left: 96, right: 96, top: 175 }}>
+        <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 76, lineHeight: 1.08, letterSpacing: -1.5 }}>{headline}</div>
+        <div style={{ marginTop: 20, fontSize: 24, color: MUTED }}>{subtitle}</div>
       </div>
 
       <div style={{ position: "absolute", left: 96, right: 96, top: 400, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
@@ -112,7 +104,9 @@ export function SchemesTweet() {
                 <span>{r.id === "wots" ? "root" : "certified"}</span>
               </div>
               <div style={{ padding: "20px 18px 22px" }}>
-                <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 30, letterSpacing: -0.6, color: FG }}>{s.name}</div>
+                <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: s.name.length > 14 ? 24 : 30, letterSpacing: -0.6, color: FG, whiteSpace: "nowrap", lineHeight: "36px" }}>
+                  {s.name}
+                </div>
                 <div style={{ marginTop: 6, fontSize: 15, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {s.aka} · {s.family.split(" · ")[0]}
                 </div>
@@ -141,7 +135,42 @@ export function SchemesTweet() {
         })}
       </div>
 
+      {footer && (
+        <div style={{ position: "absolute", left: 96, right: 96, bottom: 56, fontFamily: MONO, fontSize: 16, color: DIM }}>{footer}</div>
+      )}
+
       <div style={{ position: "absolute", inset: 0, backgroundImage: NOISE, opacity: 0.14, mixBlendMode: "overlay", pointerEvents: "none" }} />
     </div>
+  );
+}
+
+export function SchemesTweet() {
+  return (
+    <SchemesGraphic
+      ids={SCHEME_IDS_V1}
+      tag="new · signature schemes"
+      headline={
+        <>
+          Choose how your coin is <span style={{ fontStyle: "italic", color: GREEN, whiteSpace: "nowrap" }}>signed</span>.
+        </>
+      }
+      subtitle="Four post-quantum schemes. One identity. Every key certified by your hash-based root."
+    />
+  );
+}
+
+export function MoreSchemesTweet() {
+  return (
+    <SchemesGraphic
+      ids={SCHEME_IDS_V2}
+      tag="new · four more schemes"
+      headline={
+        <>
+          Four more ways to <span style={{ fontStyle: "italic", color: GREEN, whiteSpace: "nowrap" }}>sign</span>.
+        </>
+      }
+      subtitle="Dilithium at level 5, SPHINCS+ on SHA-3, Falcon-1024, and an ed25519 + ML-DSA hybrid where both signatures must verify."
+      footer="also available: WOTS + Merkle · ML-DSA-65 · SLH-DSA-128s · Falcon-512 — eight schemes, one identity"
+    />
   );
 }

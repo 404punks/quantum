@@ -32,10 +32,19 @@ function impls(): Promise<Impls> {
     import("@noble/post-quantum/ml-dsa.js"),
     import("@noble/post-quantum/slh-dsa.js"),
     import("@noble/post-quantum/falcon.js"),
-  ]).then(([m, s, f]) => ({
+    import("@noble/post-quantum/hybrid.js"),
+    import("@noble/curves/ed25519.js"),
+    import("@noble/hashes/sha3.js"),
+  ]).then(([m, s, f, h, ed, sha3]) => ({
     "ml-dsa-65": m.ml_dsa65 as unknown as Impl,
     "slh-dsa-128s": s.slh_dsa_sha2_128s as unknown as Impl,
     "falcon-512": f.falcon512 as unknown as Impl,
+    "ml-dsa-87": m.ml_dsa87 as unknown as Impl,
+    "slh-dsa-shake-128f": s.slh_dsa_shake_128f as unknown as Impl,
+    "falcon-1024": f.falcon1024 as unknown as Impl,
+    // Composite: one 32-byte seed expanded with SHAKE256 into an ed25519 key and an
+    // ML-DSA-65 key; a signature is both signatures and verifies only if both do.
+    "ed25519-ml-dsa-65": h.combineSigners(32, h.expandSeedXof(sha3.shake256), h.ecSigner(ed.ed25519), m.ml_dsa65) as unknown as Impl,
   }));
   return implsPromise;
 }

@@ -7,7 +7,7 @@ import { AddrType, W, address, digits, leafHash, secretElement, thash } from "@/
 import { nodeHash } from "@/lib/pq/xmss";
 import { launchDigest } from "@/lib/pq/messages";
 import { MONO, SANS, SERIF } from "./fonts";
-import { SchemesTweet } from "./schemes-graphic";
+import { MoreSchemesTweet, SchemesTweet } from "./schemes-graphic";
 
 /**
  * Brand graphics in the site's own visual language: serif headline with an
@@ -524,6 +524,7 @@ export function ProfilePicture() {
 export type Graphic = { id: string; title: string; note: string; w: number; h: number; group: string; Component: () => ReactNode };
 
 export const GRAPHICS: Graphic[] = [
+  { id: "more-schemes", title: "Four more schemes", note: "ML-DSA-87 · SLH-DSA-SHAKE · Falcon-1024 · hybrid", w: 1600, h: 900, group: "Tweets · 16:9", Component: MoreSchemesTweet },
   { id: "schemes", title: "Signature schemes", note: "WOTS · ML-DSA · SLH-DSA · Falcon", w: 1600, h: 900, group: "Tweets · 16:9", Component: SchemesTweet },
   { id: "intro", title: "Introduction", note: "Launch announcement", w: 1600, h: 900, group: "Tweets · 16:9", Component: IntroTweet },
   { id: "bunker-mode", title: "Bunker mode is live", note: "Launch day", w: 1600, h: 900, group: "Tweets · 16:9", Component: BunkerModeTweet },

@@ -246,6 +246,10 @@ export default function Page() {
                 ["ML-DSA-65 (Dilithium)", "FIPS 204", "Module-LWE / SIS lattices", "3,309 B", "1,952 B"],
                 ["SLH-DSA-SHA2-128s (SPHINCS+)", "FIPS 205", "SHA-256 (stateless)", "7,856 B", "32 B"],
                 ["Falcon-512 (FN-DSA)", "FIPS 206 draft", "NTRU lattices", "≤ 666 B", "897 B"],
+                ["ML-DSA-87 (Dilithium5)", "FIPS 204, level 5", "Module-LWE / SIS lattices", "4,627 B", "2,592 B"],
+                ["SLH-DSA-SHAKE-128f (SPHINCS+)", "FIPS 205", "SHA-3 / SHAKE256 (stateless)", "17,088 B", "32 B"],
+                ["Falcon-1024 (FN-DSA)", "FIPS 206 draft, level 5", "NTRU lattices", "≤ 1,280 B", "1,793 B"],
+                ["ed25519 + ML-DSA-65 (hybrid)", "IETF composite draft", "either curve or lattice must hold", "3,373 B", "1,984 B"],
               ]}
             />
             <Formula>
@@ -255,6 +259,12 @@ export default function Page() {
               <br />
               d = H(&quot;launch&quot; ‖ creator ‖ image ‖ mint ‖ name ‖ <B>scheme</B> ‖ symbol)
             </Formula>
+            <P>
+              The hybrid is a composite signature: a single seed expands (SHAKE256) into an ed25519 key and an ML-DSA-65 key, and a
+              signature is both signatures concatenated. It verifies only if <B>both</B> verify, so it is secure as long as either
+              assumption survives. SLH-DSA-SHAKE swaps the SHA-2 family for SHA-3, so the two SPHINCS+ options rest on different hash
+              designs.
+            </P>
             <P>
               A scheme attestation carries its signature, the scheme public key and the WOTS certificate, so verification needs only
               the identity root: check the certificate against the root, then the signature against the certified key. The digest
