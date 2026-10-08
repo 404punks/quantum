@@ -44,6 +44,14 @@ export function Navbar() {
                 {label}
               </Link>
             ))}
+            <a
+              href="https://github.com/pqcmarket"
+              target="_blank"
+              rel="noreferrer"
+              className="cursor-pointer rounded-md px-3 py-1.5 text-[13.5px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            >
+              GitHub
+            </a>
           </nav>
 
           <div className="flex items-center gap-2">
@@ -73,6 +81,15 @@ export function Navbar() {
                 {label}
               </Link>
             ))}
+            <a
+              href="https://github.com/pqcmarket"
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setOpen(false)}
+              className="block cursor-pointer rounded-md px-2 py-2.5 text-sm text-muted hover:bg-surface-2 hover:text-fg"
+            >
+              GitHub
+            </a>
           </nav>
         )}
       </header>

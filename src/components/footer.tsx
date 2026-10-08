@@ -18,6 +18,9 @@ export function Footer() {
           <a href="https://x.com/pqcmarket" target="_blank" rel="noreferrer" className="cursor-pointer hover:text-fg">
             Twitter
           </a>
+          <a href="https://github.com/pqcmarket" target="_blank" rel="noreferrer" className="cursor-pointer hover:text-fg">
+            GitHub
+          </a>
         </div>
       </div>
     </footer>
