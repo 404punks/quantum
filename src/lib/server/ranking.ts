@@ -1,31 +1,14 @@
 import "server-only";
 import { bondingCurvePda, bondingCurveMarketCap } from "@pump-fun/pump-sdk";
-import { SOL_MINT, multiPrice, tokenOverview } from "./birdeye";
 import { cached } from "./cache";
+import { dexStats, solPrice } from "./dexscreener";
+import { holderCounts } from "./holders";
 import { LAMPORTS_PER_SOL, connection, pumpSdk } from "./solana";
 
 export type RankSort = "mcap" | "volume" | "holders";
 
-const PUMP_SUPPLY = 1_000_000_000;
-const OVERVIEW_CONCURRENCY = 8;
-
-/** Runs `fn` over items with at most `limit` in flight (keeps Birdeye under its rate limit). */
-async function pool<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
-  const out = new Array<R>(items.length);
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (next < items.length) {
-        const i = next++;
-        out[i] = await fn(items[i]);
-      }
-    }),
-  );
-  return out;
-}
-
-/** Bonding-curve market cap in USD for coins Birdeye hasn't priced yet (chunked: max 100 accounts per RPC call). */
-async function curveMarketCaps(mints: string[], solPrice: number): Promise<Record<string, number>> {
+/** Bonding-curve market cap in USD for coins DexScreener hasn't listed yet (chunked: max 100 accounts per RPC call). */
+async function curveMarketCaps(mints: string[], sol: number): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
   for (let i = 0; i < mints.length; i += 100) {
     const chunk = mints.slice(i, i + 100);
@@ -33,41 +16,30 @@ async function curveMarketCaps(mints: string[], solPrice: number): Promise<Recor
     infos.forEach((info, j) => {
       const c = info ? pumpSdk.decodeBondingCurveNullable(info) : null;
       if (!c || c.virtualTokenReserves.isZero()) return;
-      const sol =
-        bondingCurveMarketCap({ mintSupply: c.tokenTotalSupply, virtualQuoteReserves: c.virtualQuoteReserves, virtualTokenReserves: c.virtualTokenReserves }).toNumber() /
-        LAMPORTS_PER_SOL;
-      out[chunk[j]] = sol * solPrice;
+      const lamports = bondingCurveMarketCap({
+        mintSupply: c.tokenTotalSupply,
+        virtualQuoteReserves: c.virtualQuoteReserves,
+        virtualTokenReserves: c.virtualTokenReserves,
+      }).toNumber();
+      out[chunk[j]] = (lamports / LAMPORTS_PER_SOL) * sol;
     });
   }
   return out;
 }
 
-/** Slow-moving per-coin stats for ranking only; a longer TTL than the live grid keeps credit use bounded. */
-function rankingOverview(mint: string) {
-  return cached(`be:overview-rank:${mint}`, 5 * 60_000, () => tokenOverview(mint).catch(() => null));
-}
-
 async function metric(mints: string[], sort: RankSort): Promise<Record<string, number>> {
-  if (sort === "mcap") {
-    const prices = await multiPrice(mints);
-    const solPrice = prices[SOL_MINT]?.value ?? 0;
-    const out: Record<string, number> = {};
-    const unpriced: string[] = [];
-    for (const m of mints) {
-      const p = prices[m]?.value;
-      if (p) out[m] = p * PUMP_SUPPLY;
-      else unpriced.push(m);
-    }
-    if (unpriced.length && solPrice) Object.assign(out, await curveMarketCaps(unpriced, solPrice).catch(() => ({})));
-    return out;
-  }
-  const overviews = await pool(mints, OVERVIEW_CONCURRENCY, rankingOverview);
+  if (sort === "holders") return holderCounts(mints);
+  const stats = await dexStats(mints);
   const out: Record<string, number> = {};
-  mints.forEach((m, i) => {
-    const o = overviews[i];
-    const v = sort === "volume" ? o?.v24hUSD : o?.holder;
+  for (const m of mints) {
+    const v = sort === "mcap" ? stats[m]?.marketCap : stats[m]?.volume24h;
     if (typeof v === "number") out[m] = v;
-  });
+  }
+  if (sort === "mcap") {
+    const unpriced = mints.filter((m) => out[m] === undefined);
+    const sol = unpriced.length ? await solPrice().catch(() => null) : null;
+    if (unpriced.length && sol) Object.assign(out, await curveMarketCaps(unpriced, sol).catch(() => ({})));
+  }
   return out;
 }
 

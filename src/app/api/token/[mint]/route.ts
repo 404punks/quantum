@@ -1,4 +1,6 @@
-import { SOL_MINT, multiPrice, ohlcv, tokenOverview } from "@/lib/server/birdeye";
+import { ohlcv } from "@/lib/server/birdeye";
+import { dexStats, solPrice } from "@/lib/server/dexscreener";
+import { holderCount } from "@/lib/server/holders";
 import { curveStates } from "@/lib/server/solana";
 import { db } from "@/lib/server/supabase";
 import { bad, isPubkey } from "@/lib/server/validate";
@@ -25,12 +27,29 @@ export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]
     .maybeSingle();
   if (!launch) return bad("Not a pqc.market launch", 404);
 
-  const [overview, candles, curves, prices] = await Promise.all([
-    tokenOverview(mint).catch(() => null),
+  // Market stats: DexScreener + Helius. Birdeye is only used for the chart candles.
+  const [stats, holders, candles, curves, sol] = await Promise.all([
+    dexStats([mint]).catch(() => ({}) as Awaited<ReturnType<typeof dexStats>>),
+    holderCount(mint).catch(() => null),
     ohlcv(mint, range.type, range.seconds).catch(() => []),
     curveStates([mint]).catch(() => ({}) as Awaited<ReturnType<typeof curveStates>>),
-    multiPrice([mint]).catch(() => ({}) as Awaited<ReturnType<typeof multiPrice>>),
+    solPrice().catch(() => null),
   ]);
+  const d = stats[mint];
+  const overview =
+    d || holders !== null
+      ? {
+          price: d?.price ?? null,
+          marketCap: d?.marketCap ?? null,
+          liquidity: d?.liquidity ?? null,
+          holder: holders,
+          v24hUSD: d?.volume24h ?? null,
+          priceChange24hPercent: d?.change24h ?? null,
+          trade24h: d && d.buys24h !== null && d.sells24h !== null ? d.buys24h + d.sells24h : null,
+          buys24h: d?.buys24h ?? null,
+          sells24h: d?.sells24h ?? null,
+        }
+      : null;
 
   const { pqc_identities: identity, ...row } = launch;
   return Response.json({
@@ -39,6 +58,6 @@ export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]
     overview,
     candles,
     curve: curves[mint] ?? null,
-    solPrice: prices[SOL_MINT]?.value ?? null,
+    solPrice: sol,
   });
 }

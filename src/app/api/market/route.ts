@@ -1,10 +1,13 @@
-import { SOL_MINT, multiPrice, tokenOverview } from "@/lib/server/birdeye";
+import { dexStats, solPrice } from "@/lib/server/dexscreener";
+import { holderCounts } from "@/lib/server/holders";
 import { curveStates } from "@/lib/server/solana";
 import { isPubkey } from "@/lib/server/validate";
 
-const PUMP_SUPPLY = 1_000_000_000;
-
-/** Grid snapshot: price, mcap, volume, holders and curve progress for up to 48 mints. */
+/**
+ * Grid snapshot: price, mcap, volume, holders and curve progress for up to 48
+ * mints. Market data from DexScreener (keyless), holders from Helius, curve
+ * from the chain. No Birdeye calls here: the grid refreshes constantly.
+ */
 export async function GET(request: Request) {
   const mints = (new URL(request.url).searchParams.get("mints") ?? "")
     .split(",")
@@ -12,32 +15,31 @@ export async function GET(request: Request) {
     .slice(0, 48);
   if (!mints.length) return Response.json({ solPrice: null, tokens: {} });
 
-  const [prices, curves, overviews] = await Promise.all([
-    multiPrice(mints).catch(() => ({}) as Awaited<ReturnType<typeof multiPrice>>),
+  const [stats, curves, holders, sol] = await Promise.all([
+    dexStats(mints).catch(() => ({}) as Awaited<ReturnType<typeof dexStats>>),
     curveStates(mints).catch(() => ({}) as Awaited<ReturnType<typeof curveStates>>),
-    Promise.all(mints.map((m) => tokenOverview(m).catch(() => null))),
+    holderCounts(mints).catch(() => ({}) as Record<string, number>),
+    solPrice().catch(() => null),
   ]);
 
-  const solPrice = prices[SOL_MINT]?.value ?? null;
   const tokens = Object.fromEntries(
-    mints.map((mint, i) => {
-      const p = prices[mint];
-      const o = overviews[i];
+    mints.map((mint) => {
+      const d = stats[mint];
       const curve = curves[mint] ?? null;
-      const mcapFromCurve = curve && solPrice ? curve.marketCapSol * solPrice : null;
+      const mcapFromCurve = curve && sol ? curve.marketCapSol * sol : null;
       return [
         mint,
         {
-          price: o?.price ?? p?.value ?? null,
-          change24h: o?.priceChange24hPercent ?? p?.priceChange24h ?? null,
-          marketCap: o?.marketCap ?? (p?.value ? p.value * PUMP_SUPPLY : mcapFromCurve),
-          volume24h: o?.v24hUSD ?? null,
-          holders: o?.holder ?? null,
+          price: d?.price ?? null,
+          change24h: d?.change24h ?? null,
+          marketCap: d?.marketCap ?? mcapFromCurve,
+          volume24h: d?.volume24h ?? null,
+          holders: holders[mint] ?? null,
           curve,
-          indexed: Boolean(p || o),
+          indexed: Boolean(d),
         },
       ];
     }),
   );
-  return Response.json({ solPrice, tokens });
+  return Response.json({ solPrice: sol, tokens });
 }

@@ -44,14 +44,15 @@ type Payload = {
     anchored_at: string | null;
   };
   overview: {
-    price: number;
-    marketCap: number;
-    liquidity: number;
-    holder: number;
-    v24hUSD: number;
-    priceChange24hPercent: number;
-    trade24h: number;
-    uniqueWallet24h: number;
+    price: number | null;
+    marketCap: number | null;
+    liquidity: number | null;
+    holder: number | null;
+    v24hUSD: number | null;
+    priceChange24hPercent: number | null;
+    trade24h: number | null;
+    buys24h: number | null;
+    sells24h: number | null;
   } | null;
   candles: Candle[];
   curve: CurveState | null;
@@ -189,7 +190,7 @@ export function CoinView({ mint, quantumRoute = false }: { mint: string; quantum
               <Stat k="24h volume" v={usd(overview?.v24hUSD)} />
               <Stat k="Holders" v={num(overview?.holder)} />
               <Stat k="24h trades" v={num(overview?.trade24h)} />
-              <Stat k="24h wallets" v={num(overview?.uniqueWallet24h)} />
+              <Stat k="24h buys / sells" v={overview?.buys24h != null && overview?.sells24h != null ? `${num(overview.buys24h)} / ${num(overview.sells24h)}` : "—"} />
             </dl>
             {!overview && <p className="mt-4 text-[11.5px] text-dim">Market data appears within a minute or so of launch.</p>}
           </Panel>
