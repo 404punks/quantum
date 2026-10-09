@@ -95,7 +95,7 @@ function SchemesGraphic({ ids, tag, headline, subtitle, footer, scene }: { ids: 
       <div style={{ position: "absolute", left: 96, right: 96, top: 72, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
           <img src="/logo-mark.png" alt="" style={{ width: 44, height: 44 }} />
-          <span style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 30, letterSpacing: -0.6 }}>pqc.market</span>
+          <span style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 30, letterSpacing: -0.6 }}>quantum</span>
         </div>
         <span style={{ fontFamily: MONO, fontSize: 18, color: GREEN }}>● {tag}</span>
       </div>

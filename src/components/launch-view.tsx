@@ -350,11 +350,11 @@ function LaunchForm() {
           <div>
             <Label>Website</Label>
             <div
-              title="Every coin links to its pqc.market page, so the attestation is one click from any explorer."
+              title="Every coin links to its quantum page, so the attestation is one click from any explorer."
               className="flex h-10 items-center gap-2 overflow-hidden rounded-xl border border-line bg-surface-2 px-3 font-mono text-[12px] text-muted"
             >
               <Lock size={12} className="shrink-0 text-dim" />
-              <span className="truncate">pqc.market/coin/{quantum ? "q/" : ""}{mint ? short(mint, 6, 6) : "<mint>"}</span>
+              <span className="truncate">quantum/coin/{quantum ? "q/" : ""}{mint ? short(mint, 6, 6) : "<mint>"}</span>
             </div>
           </div>
         </div>

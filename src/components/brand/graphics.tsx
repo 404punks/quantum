@@ -87,7 +87,7 @@ export function Wordmark({ size = 30 }: { size?: number }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: size * 0.42 }}>
       <img src="/logo-mark.png" alt="" style={{ width: size * 1.45, height: size * 1.45 }} />
-      <span style={{ fontFamily: SERIF, fontWeight: 700, fontSize: size, letterSpacing: -size * 0.02, color: FG }}>pqc.market</span>
+      <span style={{ fontFamily: SERIF, fontWeight: 700, fontSize: size, letterSpacing: -size * 0.02, color: FG }}>quantum</span>
     </div>
   );
 }
@@ -153,8 +153,8 @@ export function Stat({ label, value, size = 30 }: { label: string; value: string
 
 export function useSample() {
   return useMemo(() => {
-    const sk = sha256(utf8ToBytes("pqc.market/brand/sk"));
-    const pub = sha256(utf8ToBytes("pqc.market/brand/pub"));
+    const sk = sha256(utf8ToBytes("quantum/brand/sk"));
+    const pub = sha256(utf8ToBytes("quantum/brand/pub"));
     const msg = launchDigest({ mint: "pqc", creator: "brand", name: "Bunker", symbol: "BNKR", image: "logo", leaf: 7 });
     const d = digits(msg);
     const chains = Array.from({ length: 6 }, (_, i) => {
@@ -286,12 +286,12 @@ export function HowItWorksTweet() {
   const steps = [
     { n: "01", k: "derive", t: "One signature", b: "Your wallet signs a fixed message. 256 hash-based keys are derived in the browser.", c: "seed = HKDF(sig ‖ pass)" },
     { n: "02", k: "register", t: "One root", b: "The keys hash into a Merkle tree. Its root becomes your pq1… address.", c: "root = merkle(256 × wots)" },
-    { n: "03", k: "anchor", t: "One timestamp", b: "A Solana memo records the root while ed25519 is still trustworthy.", c: "memo: pqc.market:v1:anchor" },
+    { n: "03", k: "anchor", t: "One timestamp", b: "A Solana memo records the root while ed25519 is still trustworthy.", c: "memo: quantum:v1:anchor" },
     { n: "04", k: "launch", t: "One-time key", b: "A fresh leaf signs the coin. It goes live on the pump.fun curve.", c: "σ = wots.sign(d, leaf)" },
   ];
   return (
     <Frame w={1600} h={900}>
-      <TopBar pad={96} right="pqc.market/docs" />
+      <TopBar pad={96} right="quantum/docs" />
       <div style={{ position: "absolute", left: 96, top: 190 }}>
         <Headline size={80}>
           How it <Accent>works</Accent>.
@@ -471,7 +471,7 @@ export function VersusPortrait() {
       <div style={{ position: "absolute", left: 80, right: 80, top: 470, display: "flex", flexDirection: "column", gap: 36 }}>
         {[
           { title: "ed25519", sub: "solana today", color: RED, mark: "✗", items: rows.map((r) => r[0]) },
-          { title: "wots + merkle", sub: "pqc.market", color: GREEN, mark: "✓", items: rows.map((r) => r[1]) },
+          { title: "wots + merkle", sub: "quantum", color: GREEN, mark: "✓", items: rows.map((r) => r[1]) },
         ].map((col) => (
           <Terminal key={col.title} title={`$ inspect ${col.title}`} meta={col.sub}>
             {col.items.map((t) => (
@@ -488,7 +488,7 @@ export function VersusPortrait() {
           launch on pump.fun with provenance that outlives the curve
         </Mono>
         <Mono size={20} color={GREEN}>
-          pqc.market
+          quantum
         </Mono>
       </div>
     </Frame>
@@ -509,7 +509,7 @@ export function XHeader() {
           Launch coins that survive <Accent>Q-day</Accent>.
         </Headline>
         <Mono size={20} color={DIM} style={{ marginTop: 22 }}>
-          pqc.market · post-quantum launchpad on pump.fun
+          quantum · post-quantum launchpad on pump.fun
         </Mono>
         <div style={{ marginTop: 30 }}>
           <DigestCells digits={s.digits} cell={12} gap={3} />

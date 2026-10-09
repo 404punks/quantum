@@ -15,6 +15,35 @@ type Sort = "new" | "mcap" | "volume" | "holders";
 type Status = "all" | "graduated";
 type Kind = "all" | "standard" | "quantum";
 
+const LAUNCH_COLUMNS =
+  "mint, name, symbol, description, image_url, creator, pq_address, leaf_index, scheme, message_hash, dev_buy_sol, dev_vault, quote_mint, quote_symbol, quote_image, created_at, launched_at, twitter, telegram, website, pqc_identities(passphrase_hardened, anchor_tx)";
+
+/** Used when the server list route cannot read the database. Live rows are public. */
+async function launchesFromBrowser(filters: { kind: Kind; query: string; pair: PairFilterValue }) {
+  const supabase = supabaseBrowser();
+  let query = supabase.from("pqc_launches").select(LAUNCH_COLUMNS).eq("status", "live").order("launched_at", { ascending: false }).limit(48);
+  if (filters.kind === "quantum") query = query.not("dev_vault", "is", null);
+  else if (filters.kind === "standard") query = query.is("dev_vault", null);
+  if (filters.pair === "sol") query = query.is("quote_mint", null);
+  else if (filters.pair === "token") query = query.not("quote_mint", "is", null);
+  else if (filters.pair !== "all") query = query.eq("quote_mint", filters.pair);
+  const safe = filters.query.replace(/[%,()]/g, "");
+  if (safe) query = query.or(`name.ilike.%${safe}%,symbol.ilike.%${safe}%,mint.eq.${safe}`);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => {
+    const identity = row.pqc_identities as { passphrase_hardened?: boolean; anchor_tx?: string | null } | { passphrase_hardened?: boolean; anchor_tx?: string | null }[] | null;
+    const one = Array.isArray(identity) ? identity[0] : identity;
+    const { pqc_identities: _identity, ...rest } = row;
+    return {
+      ...rest,
+      leaf_index: rest.leaf_index ?? 0,
+      hardened: Boolean(one?.passphrase_hardened),
+      anchored: Boolean(one?.anchor_tx),
+    } as LaunchItem;
+  });
+}
+
 const KINDS: { value: Kind; label: string; hint: string }[] = [
   { value: "all", label: "All coins", hint: "Every quantum launch" },
   { value: "standard", label: "Standard", hint: "Post-quantum provenance, dev funds in a wallet" },
@@ -23,9 +52,9 @@ const KINDS: { value: Kind; label: string; hint: string }[] = [
 
 export function Home() {
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-8">
-      <section className="grid items-center gap-10 pb-20 pt-10 lg:grid-cols-[1fr_minmax(0,540px)] lg:pt-16">
-        <div>
+    <div className="mx-auto w-full min-w-0 max-w-7xl px-4 sm:px-8">
+      <section className="grid w-full min-w-0 items-center gap-8 pb-12 pt-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,540px)] lg:gap-10 lg:pb-20 lg:pt-16">
+        <div className="min-w-0">
           <Link
             href="/docs"
             className="group inline-flex cursor-pointer items-center gap-2 border border-up/30 bg-up/5 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-up transition-all hover:border-up hover:bg-up/10"
@@ -35,7 +64,7 @@ export function Home() {
             <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
           </Link>
 
-          <h1 className="mt-7 font-serif text-[44px] font-bold uppercase leading-[0.95] tracking-[-0.04em] sm:text-[68px]">
+          <h1 className="mt-6 font-serif text-[40px] font-bold uppercase leading-[0.95] tracking-[-0.04em] sm:mt-7 sm:text-[68px]">
             Quantum
             <br /><span className="neon-text">launch terminal</span>
           </h1>
@@ -44,12 +73,12 @@ export function Home() {
             Built for the chain today. Secured for the quantum era.
           </p>
 
-          <div className="mt-8 flex flex-wrap gap-3">
-            <ButtonLink href="/launch" variant="primary">Initialize launch →</ButtonLink>
-            <ButtonLink href="/docs">Read protocol</ButtonLink>
+          <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap">
+            <ButtonLink href="/launch" variant="primary" className="w-full sm:w-auto">Initialize launch →</ButtonLink>
+            <ButtonLink href="/docs" className="w-full sm:w-auto">Read protocol</ButtonLink>
           </div>
 
-          <dl className="mt-11 grid max-w-lg grid-cols-3 border-y border-line py-4 font-mono text-[10px] uppercase tracking-wider sm:text-[11px]">
+          <dl className="mt-8 grid w-full max-w-lg grid-cols-3 border-y border-line py-4 font-mono text-[10px] uppercase tracking-wider sm:mt-11 sm:text-[11px]">
             <div>
               <dt className="text-dim">signature</dt>
               <dd className="mt-1.5 text-up">WOTS+</dd>
@@ -65,9 +94,9 @@ export function Home() {
           </dl>
         </div>
 
-        <div className="relative">
+        <div className="relative min-w-0">
           <div aria-hidden className="absolute -inset-6 bg-up/5 blur-3xl" />
-          <ProofAnimation className="pixel-panel neon-shadow relative" />
+          <ProofAnimation className="pixel-panel neon-shadow relative max-w-full" />
         </div>
       </section>
 
@@ -122,17 +151,27 @@ function CoinsSection() {
     setMarket(null);
     setHasMore(false);
     fetch(listUrl(0))
-      .then((r) => r.json())
+      .then(async (r) => {
+        const j = await r.json().catch(() => null);
+        if (!r.ok || !j || !Array.isArray(j.launches)) throw new Error(j?.error ?? "Failed to load coins");
+        return j as { launches: LaunchItem[]; hasMore?: boolean };
+      })
       .then((j) => {
         if (cancelled) return;
-        setLaunches(j.launches ?? []);
+        setLaunches(j.launches);
         setHasMore(Boolean(j.hasMore));
       })
-      .catch(() => !cancelled && setLaunches([]));
+      .catch(async () => {
+        const fallback = await launchesFromBrowser({ kind, query, pair }).catch(() => [] as LaunchItem[]);
+        if (!cancelled) {
+          setLaunches(fallback);
+          setHasMore(false);
+        }
+      });
     return () => {
       cancelled = true;
     };
-  }, [listUrl]);
+  }, [listUrl, kind, query, pair]);
 
   async function loadMore() {
     if (!launches || loadingMore) return;
@@ -252,7 +291,7 @@ function CoinsSection() {
   }, [launches, market]);
 
   return (
-    <section className="min-h-[110vh] pb-24">
+    <section className="min-w-0 pb-16">
       <div className="mb-5 flex items-end justify-between gap-4 border-b border-line">
         <div role="tablist" aria-label="Coin type" className="-mb-px flex gap-6 sm:gap-8">
           {KINDS.map((k) => (
@@ -334,7 +373,7 @@ function CoinsSection() {
         </div>
       ) : visible.length === 0 ? (
         query || pair !== "all" ? (
-          <div className="flex flex-col items-center rounded-2xl border border-dashed border-line px-4 py-20 text-center">
+          <div className="flex w-full min-w-0 flex-col items-center rounded-2xl border border-dashed border-line px-4 py-16 text-center">
             <h3 className="font-serif text-[18px] font-bold">{query ? <>No coins match “{query}”</> : "No coins with this pair yet"}</h3>
             <p className="mt-2 max-w-sm text-[13px] text-muted">Try a name, a ticker, or paste a contract address.</p>
             <button
@@ -381,7 +420,7 @@ function Empty({ filtered }: { filtered: "graduated" | "quantum" | "standard" | 
   } as const;
   const [title, body] = filtered ? copy[filtered] : ["No coins yet", "Be the first to launch a coin with a hash-based, post-quantum provenance signature."];
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-dashed border-line px-4 py-20 text-center">
+    <div className="flex w-full min-w-0 flex-col items-center rounded-2xl border border-dashed border-line px-4 py-16 text-center">
       <h3 className="font-serif text-[18px] font-bold">{title}</h3>
       <p className="mt-2 max-w-sm text-[13px] text-muted">{body}</p>
       {filtered !== "graduated" && (

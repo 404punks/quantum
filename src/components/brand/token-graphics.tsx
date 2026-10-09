@@ -151,7 +151,7 @@ export function PqcTokenTweet() {
           <img src="/logo-mark.png" alt="" style={{ width: 76, height: 76, borderRadius: 14, border: `1px solid ${LINE}`, background: SURFACE }} />
           <div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-              <span style={{ fontFamily: SANS, fontWeight: 600, fontSize: 34, color: FG }}>{data?.launch.name ?? "pqc.market"}</span>
+              <span style={{ fontFamily: SANS, fontWeight: 600, fontSize: 34, color: FG }}>{data?.launch.name ?? "quantum"}</span>
               <span style={{ fontFamily: MONO, fontSize: 20, color: MUTED }}>${data?.launch.symbol ?? "PQC"}</span>
             </div>
             <div style={{ marginTop: 10, display: "flex", gap: 8 }}>

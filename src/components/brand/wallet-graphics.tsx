@@ -31,7 +31,7 @@ function SendTerminal({ width = 640 }: { width?: number }) {
       </Ok>
       <div style={{ marginTop: 12, color: DIM }}># 3 · record</div>
       <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        memo pqc.market:v1:transfer:pq1Hn3…W8k:<span style={{ color: GREEN }}>d369…865f</span>
+        memo quantum:v1:transfer:pq1Hn3…W8k:<span style={{ color: GREEN }}>d369…865f</span>
       </div>
       <div style={{ marginTop: 12 }}>
         <Ok>confirmed</Ok>

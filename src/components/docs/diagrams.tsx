@@ -243,7 +243,7 @@ export function DerivationDiagram() {
 export function LaunchSequence() {
   const lanes = [
     { x: 90, label: "browser" },
-    { x: 330, label: "pqc.market API" },
+    { x: 330, label: "quantum API" },
     { x: 530, label: "IPFS (Pinata)" },
     { x: 650, label: "Solana" },
   ];

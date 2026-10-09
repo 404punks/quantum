@@ -5,11 +5,12 @@ let client: SupabaseClient | undefined;
 
 function supabase() {
   if (!client) {
-    const url = process.env.SUPABASE_URL?.trim() ?? "";
-    if (!url) throw new Error("supabaseUrl is required.");
-    client = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY ?? "", {
-      auth: { persistSession: false },
-    });
+    // Public reads (the coin list) work with the anon key. The service role is
+    // preferred so writes and private tables keep working when it is configured.
+    const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    if (!url.startsWith("http://") && !url.startsWith("https://")) throw new Error("supabaseUrl is required.");
+    client = createClient(url, key, { auth: { persistSession: false } });
   }
   return client;
 }

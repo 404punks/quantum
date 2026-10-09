@@ -203,7 +203,7 @@ export default function Page() {
               Leaf i signs a domain-separated digest over the coin&apos;s public fields, sorted by key. The same leaf deterministically owns
               the mint keypair, so the mint address itself is a commitment to the identity.
             </P>
-            <Formula>d = SHA-256(&quot;pqc.market/launch/v1\n&quot; ‖ creator ‖ image ‖ leaf ‖ mint ‖ name ‖ symbol)</Formula>
+            <Formula>d = SHA-256(&quot;quantum/launch/v1\n&quot; ‖ creator ‖ image ‖ leaf ‖ mint ‖ name ‖ symbol)</Formula>
             <Figure caption="fig. 5 · launch sequence. The server never holds the mint key or any WOTS secret.">
               <LaunchSequence />
             </Figure>
@@ -216,7 +216,7 @@ export default function Page() {
               <P>The pinned JSON carries the full attestation, so verification needs neither our API nor our database:</P>
               <CodeBlock title="metadata.json">{`{
   "name": "…", "symbol": "…", "image": "ipfs://…",
-  "website": "https://pqc.market/coin/<mint>",
+  "website": "quantum/coin/<mint>",
   "pqc": {
     "version": 1,
     "scheme": "WOTS(w=16,SHA-256)+Merkle(h=8)",
@@ -255,7 +255,7 @@ export default function Page() {
               ]}
             />
             <Formula>
-              sk<sub>s</sub> = keygen<sub>s</sub>(HKDF(sk.seed, &quot;pqc.market/scheme/v1&quot;, s))
+              sk<sub>s</sub> = keygen<sub>s</sub>(HKDF(sk.seed, &quot;quantum/scheme/v1&quot;, s))
               <br />
               cert<sub>s</sub> = WOTS.sign(H(&quot;bind&quot; ‖ pq-address ‖ s ‖ H(pk<sub>s</sub>)), leaf)
               <br />
@@ -278,7 +278,7 @@ export default function Page() {
           <Section id="proofs" title="Proof of possession">
             <P>
               A challenge-response login that never consults ed25519. The server issues a 32-byte nonce valid for five minutes; the
-              client signs <Code>SHA-256(&quot;pqc.market/proof/v1\n&quot; ‖ leaf ‖ nonce ‖ wallet)</Code> with its next unused leaf.
+              client signs <Code>SHA-256(&quot;quantum/proof/v1\n&quot; ‖ leaf ‖ nonce ‖ wallet)</Code> with its next unused leaf.
             </P>
             <Table
               head={["Check", "Failure"]}
@@ -296,7 +296,7 @@ export default function Page() {
 
           <Section id="wallets" title="Wallets">
             <P>
-              A quantum wallet is an ed25519 keypair derived from the identity seed (<Code>HKDF(sk.seed, &quot;pqc.market/wallet/v1&quot;, index)</Code>),
+              A quantum wallet is an ed25519 keypair derived from the identity seed (<Code>HKDF(sk.seed, &quot;quantum/wallet/v1&quot;, index)</Code>),
               re-derived in the browser after unlock and never stored. Registration is a statement signed by the derived key itself, so the
               server only ever holds public addresses.
             </P>
@@ -305,7 +305,7 @@ export default function Page() {
               key signs a transfer digest whose hash rides along in an SPL memo. Rotating a wallet sweeps everything to a freshly derived
               address and retires the old one.
             </P>
-            <Formula>d = SHA-256(&quot;pqc.market/transfer/v1
+            <Formula>d = SHA-256(&quot;quantum/transfer/v1
 &quot; ‖ amount ‖ from ‖ mint ‖ nonce ‖ to ‖ leaf | scheme)</Formula>
             <P>
               <B>Be clear about the boundary.</B> Solana still enforces only the ed25519 signature on-chain. The post-quantum half is a
@@ -323,12 +323,12 @@ export default function Page() {
               the fees cannot move vault funds, and neither can anyone else who breaks a curve.
             </P>
             <Formula>vault[i] = PDA(&quot;vault&quot;, 0x01, SHA-256(pubSeedᵢ ‖ pk₀ ‖ … ‖ pk₆₆))
-seedsᵢ = HKDF(identity seeds, &quot;pqc.market/vault/v1/sk|pub&quot; ‖ i)</Formula>
+seedsᵢ = HKDF(identity seeds, &quot;quantum/vault/v1/sk|pub&quot; ‖ i)</Formula>
             <P>
               A withdrawal signs one digest with vault[i]&apos;s one-time key. It binds the program, vault, recipient, mint, amount and the
               hash of vault[i+1], so the signature authorizes that exact spend and nothing else:
             </P>
-            <Formula>d = SHA-256(&quot;pqc.market/vault-spend/v1&quot; ‖ program ‖ vault ‖ recipient ‖ mint ‖ amount ‖ H(vault[i+1]))</Formula>
+            <Formula>d = SHA-256(&quot;quantum/vault-spend/v1&quot; ‖ program ‖ vault ‖ recipient ‖ mint ‖ amount ‖ H(vault[i+1]))</Formula>
             <P>
               The 2,176-byte payload is staged in a buffer account over three transactions, then the withdraw instruction walks the 67
               hash chains (45 to 990 SHA-256 calls), checks that the result derives the vault&apos;s address, pays the recipient, rolls
@@ -372,7 +372,7 @@ seedsᵢ = HKDF(identity seeds, &quot;pqc.market/vault/v1/sk|pub&quot; ‖ i)</F
                 ["Address", "pq1 ‖ base58(SHA-256(dom ‖ pk.seed ‖ root)[0..20])"],
                 ["Passphrase KDF", "scrypt N = 2¹⁵, r = 8, p = 1"],
                 ["Seed KDF", "HKDF-SHA256"],
-                ["Mint KDF", "HKDF-SHA256(sk.seed, 'pqc.market/mint/v1', u32be(leaf))"],
+                ["Mint KDF", "HKDF-SHA256(sk.seed, 'quantum/mint/v1', u32be(leaf))"],
               ]}
             />
           </Section>
