@@ -59,6 +59,11 @@ async function list(params: URLSearchParams) {
   const kind = params.get("kind");
   if (kind === "quantum") idQuery = idQuery.not("dev_vault", "is", null);
   else if (kind === "standard") idQuery = idQuery.is("dev_vault", null);
+  // Pair: "sol" (the default quote), "token" (any non-SOL pair) or a specific pair mint.
+  const pair = params.get("pair");
+  if (pair === "sol") idQuery = idQuery.is("quote_mint", null);
+  else if (pair === "token") idQuery = idQuery.not("quote_mint", "is", null);
+  else if (pair && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(pair)) idQuery = idQuery.eq("quote_mint", pair);
   const { data: ids, error: idError } = await idQuery;
   if (idError) throw new Error(idError.message);
   let mints = (ids ?? []).map((r) => r.mint as string);

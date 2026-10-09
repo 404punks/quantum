@@ -8,6 +8,7 @@ import { cn, keepKnown } from "@/lib/format";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 import { CoinCard, CoinCardSkeleton } from "./coin-card";
 import { ProofAnimation } from "./proof-animation";
+import { PairFilter, type PairFilterValue } from "./pair-filter";
 import { ButtonLink, Segmented } from "./ui";
 
 type Sort = "new" | "mcap" | "volume" | "holders";
@@ -81,6 +82,7 @@ function CoinsSection() {
   const [sort, setSort] = useState<Sort>("new");
   const [status, setStatus] = useState<Status>("all");
   const [kind, setKind] = useState<Kind>("all");
+  const [pair, setPair] = useState<PairFilterValue>("all");
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState("");
@@ -108,8 +110,8 @@ function CoinsSection() {
   // Graduation is filtered on the server across every live launch, not just the loaded page.
   const listUrl = useCallback(
     (offset: number) =>
-      `/api/launches?offset=${offset}${status === "graduated" ? "&status=graduated" : ""}${sort !== "new" ? `&sort=${sort}` : ""}${kind !== "all" ? `&kind=${kind}` : ""}${query ? `&q=${encodeURIComponent(query)}` : ""}`,
-    [status, sort, kind, query],
+      `/api/launches?offset=${offset}${status === "graduated" ? "&status=graduated" : ""}${sort !== "new" ? `&sort=${sort}` : ""}${kind !== "all" ? `&kind=${kind}` : ""}${query ? `&q=${encodeURIComponent(query)}` : ""}${pair !== "all" ? `&pair=${pair}` : ""}`,
+    [status, sort, kind, query, pair],
   );
 
   useEffect(() => {
@@ -153,6 +155,8 @@ function CoinsSection() {
   kindRef.current = kind;
   const queryRef = useRef(query);
   queryRef.current = query;
+  const pairRef = useRef(pair);
+  pairRef.current = pair;
 
   // Realtime Broadcast: the server announces each launch once it is live. No
   // database polling or per-tab RLS checks, unlike postgres_changes.
@@ -189,6 +193,8 @@ function CoinsSection() {
         };
         if (statusRef.current !== "all" || sortRef.current !== "new" || queryRef.current) return;
         if ((kindRef.current === "quantum" && !item.dev_vault) || (kindRef.current === "standard" && item.dev_vault)) return;
+        const p = pairRef.current;
+        if ((p === "sol" && item.quote_mint) || (p === "token" && !item.quote_mint) || (p !== "all" && p !== "sol" && p !== "token" && item.quote_mint !== p)) return;
         setLaunches((prev) => (prev && !prev.some((l) => l.mint === item.mint) ? [item, ...prev] : prev));
         setFresh((prev) => new Set(prev).add(item.mint));
         timers.push(
@@ -306,6 +312,7 @@ function CoinsSection() {
               { value: "holders", label: "Holders" },
             ]}
           />
+          <PairFilter value={pair} onChange={setPair} />
           <Segmented
             value={status}
             onChange={setStatus}
@@ -324,16 +331,19 @@ function CoinsSection() {
           ))}
         </div>
       ) : visible.length === 0 ? (
-        query ? (
+        query || pair !== "all" ? (
           <div className="flex flex-col items-center rounded-2xl border border-dashed border-line px-4 py-20 text-center">
-            <h3 className="font-serif text-[18px] font-bold">No coins match “{query}”</h3>
+            <h3 className="font-serif text-[18px] font-bold">{query ? <>No coins match “{query}”</> : "No coins with this pair yet"}</h3>
             <p className="mt-2 max-w-sm text-[13px] text-muted">Try a name, a ticker, or paste a contract address.</p>
             <button
               type="button"
-              onClick={() => setSearch("")}
+              onClick={() => {
+                setSearch("");
+                setPair("all");
+              }}
               className="mt-6 cursor-pointer rounded-md border border-line bg-surface px-4 py-2 text-[13px] text-fg transition-colors hover:border-line-strong hover:bg-surface-2"
             >
-              Clear search
+              Clear filters
             </button>
           </div>
         ) : (
