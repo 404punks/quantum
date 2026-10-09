@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import type { LaunchItem, MarketItem } from "@/lib/types";
-import { ago, cn, num, pct, usd } from "@/lib/format";
+import { ago, cn, coinPath, num, pct, usd } from "@/lib/format";
 import { SCHEMES, type SchemeId } from "@/lib/pq/scheme-info";
+import { Lock } from "lucide-react";
 import { DigestGrid } from "./digest-grid";
 import { Skeleton } from "./ui";
 
 type CardLaunch = Pick<LaunchItem, "mint" | "name" | "symbol" | "image_url" | "leaf_index"> &
-  Partial<Pick<LaunchItem, "launched_at" | "message_hash" | "scheme">> & { digest?: Uint8Array };
+  Partial<Pick<LaunchItem, "launched_at" | "message_hash" | "scheme" | "dev_vault">> & { digest?: Uint8Array };
 
 export function CoinCard({
   launch,
@@ -27,9 +28,17 @@ export function CoinCard({
   const up = (change ?? 0) >= 0;
   const progress = market?.curve?.progress ?? 0;
   const graduated = market?.curve?.complete;
+  const quantum = Boolean(launch.dev_vault);
 
   const body = (
     <>
+      {quantum && <QuantumFrame />}
+      {quantum && (
+        <span className="absolute -top-2 right-5 z-10 flex items-center gap-1.5 bg-fg px-1.5 font-mono text-[9.5px] font-semibold leading-4 tracking-[0.14em] text-bg">
+          <span className="q-blink inline-block h-2 w-1 bg-bg" />
+          QUANTUM
+        </span>
+      )}
       {fresh && (
         <span className="absolute -top-2.5 left-4 border border-up/60 bg-bg px-1.5 font-mono text-[10px] text-up">just launched</span>
       )}
@@ -44,7 +53,7 @@ export function CoinCard({
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-[15px] font-semibold text-fg group-hover:underline">{launch.name || "Untitled"}</h3>
           <div className="mt-0.5 font-mono text-[12px] text-muted">${launch.symbol || "TICKER"}</div>
-          <div className="mt-1.5 font-mono text-[11px] text-dim">
+          <div className="mt-1.5 truncate font-mono text-[11px] text-dim">
             {schemeLabel(launch.scheme, launch.leaf_index)}
             {launch.launched_at && <> · {ago(launch.launched_at)}</>}
           </div>
@@ -54,14 +63,30 @@ export function CoinCard({
         </div>
       </header>
 
-      <div className="mt-4 border border-line bg-bg px-2.5 pb-2.5 pt-2">
+      <div
+        className={cn("relative mt-4 overflow-hidden border bg-bg px-2.5 pb-2.5 pt-2", quantum ? "border-line-strong" : "border-line")}
+        style={quantum ? { backgroundImage: HATCH } : undefined}
+      >
+        {quantum && (
+          <span aria-hidden className="q-scan pointer-events-none absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-transparent via-white/[0.09] to-transparent" />
+        )}
         <div className="mb-1.5 flex justify-between font-mono text-[10px] text-dim">
-          <span>attestation digest</span>
-          <span>{launch.scheme && launch.scheme !== "wots" ? SCHEMES[launch.scheme as SchemeId]?.aka : `leaf #${launch.leaf_index}`}</span>
+          <span>{quantum ? "hash-based attestation" : "attestation digest"}</span>
+          {quantum ? (
+            <span
+              className="flex items-center gap-1 text-muted"
+              title={launch.dev_vault && launch.dev_vault.length > 20 ? `Dev funds in quantum vault ${launch.dev_vault}` : "Dev funds go to your quantum vault"}
+            >
+              <Lock size={9} className="text-fg" /> dev funds vault-locked
+            </span>
+          ) : (
+            <span>{launch.scheme && launch.scheme !== "wots" ? SCHEMES[launch.scheme as SchemeId]?.aka : `leaf #${launch.leaf_index}`}</span>
+          )}
         </div>
         <DigestGrid digest={launch.digest ?? launch.message_hash} cellClass="h-3.5" />
       </div>
 
+      <div className="mt-auto">
       <dl className="mt-4 grid grid-cols-3 gap-3">
         <Stat label="Market cap" value={usd(market?.marketCap)} loading={marketLoading} />
         <Stat label="Volume 24h" value={usd(market?.volume24h)} loading={marketLoading} />
@@ -76,22 +101,46 @@ export function CoinCard({
         <div className="h-1 overflow-hidden bg-surface-3">
           <div
             className={cn("h-full transition-[width] duration-700", graduated ? "bg-up" : "bg-fg")}
-            style={{ width: `${Math.max(progress * 100, 1)}%` }}
+            style={{
+              width: `${Math.max(progress * 100, 1)}%`,
+              ...(quantum && !graduated ? { backgroundImage: "repeating-linear-gradient(90deg, transparent 0 3px, rgba(0,0,0,0.55) 3px 4px)" } : {}),
+            }}
           />
         </div>
+      </div>
       </div>
     </>
   );
 
   const className = cn(
     "fade-up group relative flex flex-col border bg-surface p-4 transition-colors duration-700",
-    fresh ? "border-up/70 shadow-[0_0_0_1px_var(--up),0_0_28px_-8px_var(--up)]" : "border-line",
+    fresh ? "border-up/70 shadow-[0_0_0_1px_var(--up),0_0_28px_-8px_var(--up)]" : quantum ? "border-line-strong" : "border-line",
   );
-  if (preview) return <article className={className}>{body}</article>;
+  const style = quantum ? { backgroundImage: DOTS, backgroundSize: "12px 12px" } : undefined;
+  if (preview) return <article className={className} style={style}>{body}</article>;
   return (
-    <Link href={`/coin/${launch.mint}`} className={cn(className, "cursor-pointer hover:border-line-strong hover:bg-surface-2")}>
+    <Link href={coinPath(launch.mint, quantum)} style={style} className={cn(className, "cursor-pointer hover:border-line-strong hover:bg-surface-2")}>
       {body}
     </Link>
+  );
+}
+
+/** Faint dot grid across a quantum card. */
+const DOTS = "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)";
+
+/** Faint 45° hatch behind a quantum coin's attestation. */
+const HATCH = "repeating-linear-gradient(135deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 7px)";
+
+/** Viewfinder corners: the card reads as sealed, not glowing. They grow on hover. */
+function QuantumFrame() {
+  const corner = "pointer-events-none absolute z-10 h-3 w-3 border-fg transition-all duration-300 group-hover:h-5 group-hover:w-5";
+  return (
+    <>
+      <span aria-hidden className={cn(corner, "-left-px -top-px border-l-2 border-t-2")} />
+      <span aria-hidden className={cn(corner, "-right-px -top-px border-r-2 border-t-2")} />
+      <span aria-hidden className={cn(corner, "-bottom-px -left-px border-b-2 border-l-2")} />
+      <span aria-hidden className={cn(corner, "-bottom-px -right-px border-b-2 border-r-2")} />
+    </>
   );
 }
 

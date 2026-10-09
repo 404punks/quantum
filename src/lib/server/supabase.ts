@@ -39,6 +39,7 @@ export type LaunchRow = {
   scheme: string;
   attestation: unknown;
   dev_buy_sol: number;
+  dev_vault: string | null;
   status: "pending" | "live" | "failed";
   tx_signature: string | null;
   created_at: string;

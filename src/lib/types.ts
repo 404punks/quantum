@@ -10,6 +10,8 @@ export type LaunchItem = {
   message_hash?: string;
   scheme?: string;
   dev_buy_sol: number;
+  /** Quantum launches: the pqc-vault the dev buy was delivered into. */
+  dev_vault?: string | null;
   created_at: string;
   launched_at: string | null;
   twitter: string | null;

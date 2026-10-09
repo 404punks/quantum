@@ -22,6 +22,7 @@ const TOC: TocItem[] = [
   { id: "schemes", label: "Signature schemes" },
   { id: "proofs", label: "Proof of possession" },
   { id: "wallets", label: "Wallets" },
+  { id: "vault", label: "Quantum vault" },
   { id: "security", label: "Security analysis" },
   { id: "parameters", label: "Parameters" },
   { id: "verify-yourself", label: "Verify it yourself" },
@@ -310,8 +311,40 @@ export default function Page() {
               <B>Be clear about the boundary.</B> Solana still enforces only the ed25519 signature on-chain. The post-quantum half is a
               quantum-proof <Em>record of authorization</Em>: after a curve break it lets an owner prove which transfers they signed and which
               were forged, but it does not stop a forged transfer from executing. Holding value under hash-based keys needs an on-chain
-              verifier program, a Winternitz vault whose spends require a WOTS signature checked by the program. That is the next step on the
-              roadmap and the reason these wallets are labelled identity-derived rather than quantum-secured.
+              verifier program: that is the <a href="#vault" className="cursor-pointer text-fg underline underline-offset-2">quantum vault</a> below,
+              and the reason these wallets are labelled identity-derived rather than quantum-secured.
+            </P>
+          </Section>
+
+          <Section id="vault" title="Quantum vault">
+            <P>
+              The vault is a Solana program (<Code>DNsPfPecrbnS7jFqMpEDG3VoWAdkuaU2VxsmaPENcg9F</Code>) that holds SOL, SPL and Token-2022
+              balances at a PDA which only a <B>WOTS signature verified on-chain</B> can spend. There is no ed25519 path: the wallet that pays
+              the fees cannot move vault funds, and neither can anyone else who breaks a curve.
+            </P>
+            <Formula>vault[i] = PDA(&quot;vault&quot;, 0x01, SHA-256(pubSeedᵢ ‖ pk₀ ‖ … ‖ pk₆₆))
+seedsᵢ = HKDF(identity seeds, &quot;pqc.market/vault/v1/sk|pub&quot; ‖ i)</Formula>
+            <P>
+              A withdrawal signs one digest with vault[i]&apos;s one-time key. It binds the program, vault, recipient, mint, amount and the
+              hash of vault[i+1], so the signature authorizes that exact spend and nothing else:
+            </P>
+            <Formula>d = SHA-256(&quot;pqc.market/vault-spend/v1&quot; ‖ program ‖ vault ‖ recipient ‖ mint ‖ amount ‖ H(vault[i+1]))</Formula>
+            <P>
+              The 2,176-byte payload is staged in a buffer account over three transactions, then the withdraw instruction walks the 67
+              hash chains (45 to 990 SHA-256 calls), checks that the result derives the vault&apos;s address, pays the recipient, rolls
+              everything else into vault[i+1] and turns vault[i] into a permanent tombstone. Deposits that arrive at a retired address
+              afterwards can be forwarded by anyone, only ever to the next vault the tombstone names.
+            </P>
+            <P>
+              <B>One key, one message.</B> Two WOTS signatures from one key leak enough to forge a third. Before anything is broadcast, the
+              browser records the spend, keyed by an HMAC only the identity owner can compute, and every retry or second device replays that
+              record. Signing is deterministic, so a replay produces the identical signature. The vault index itself lives on-chain: it is the
+              first vault that is not a tombstone.
+            </P>
+            <P>
+              <B>The remaining dependency</B> is how the identity is derived. A wallet-only identity is re-derivable by whoever holds the wallet
+              key, so a post-quantum attacker who recovers that key could also derive the vault keys. A passphrase-hardened identity closes
+              that gap.
             </P>
           </Section>
 

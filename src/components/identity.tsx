@@ -69,6 +69,7 @@ type Ctx = {
   register: (u: Unlocked) => Promise<void>;
   signWithLeaf: (digest: Uint8Array, leaf: number) => PqSignature;
   signTransaction: (tx: VersionedTransaction) => Promise<VersionedTransaction>;
+  signAllTransactions: (txs: VersionedTransaction[]) => Promise<VersionedTransaction[]>;
   unlockOpen: boolean;
   requestUnlock: () => void;
   closeUnlock: () => void;
@@ -251,6 +252,19 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
     [walletProvider],
   );
 
+  /** One wallet prompt for several transactions; falls back to one prompt each. */
+  const signAllTransactions = useCallback(
+    async (txs: VersionedTransaction[]) => {
+      if (!walletProvider) throw new Error("Connect a wallet first");
+      if (!txs.length) return [];
+      if (typeof walletProvider.signAllTransactions === "function") return walletProvider.signAllTransactions(txs);
+      const out: VersionedTransaction[] = [];
+      for (const tx of txs) out.push(await walletProvider.signTransaction(tx));
+      return out;
+    },
+    [walletProvider],
+  );
+
   const value = useMemo<Ctx>(
     () => ({
       wallet,
@@ -274,11 +288,12 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
       schemeKeys,
       ensureSchemeKey,
       signTransaction,
+      signAllTransactions,
       unlockOpen,
       requestUnlock,
       closeUnlock,
     }),
-    [wallet, open, disconnect, remote, leaves, schemeKeys, ensureSchemeKey, nextLeaf, remoteLoading, refresh, unlocked, phase, unlock, register, signWithLeaf, signTransaction, unlockOpen, requestUnlock, closeUnlock],
+    [wallet, open, disconnect, remote, leaves, schemeKeys, ensureSchemeKey, nextLeaf, remoteLoading, refresh, unlocked, phase, unlock, register, signWithLeaf, signTransaction, signAllTransactions, unlockOpen, requestUnlock, closeUnlock],
   );
 
   return <IdentityContext.Provider value={value}>{children}</IdentityContext.Provider>;

@@ -91,6 +91,24 @@ body::after {
   animation: fade-up 0.35s ease-out both;
 }
 
+/* Quantum coin cards: a scanline sweeping the attestation, a blinking cursor. */
+@keyframes q-scan {
+  0% { transform: translateY(-120%); }
+  100% { transform: translateY(420%); }
+}
+.q-scan {
+  animation: q-scan 3.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes q-blink {
+  50% { opacity: 0; }
+}
+.q-blink {
+  animation: q-blink 1.1s steps(1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .q-scan, .q-blink { animation: none; }
+}
+
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { scrollbar-width: none; }
 
@@ -99,4 +117,5 @@ body::after {
 html {
   scroll-behavior: smooth;
 }
+
 

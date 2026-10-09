@@ -12,6 +12,13 @@ import { ButtonLink, Segmented } from "./ui";
 
 type Sort = "new" | "mcap" | "volume" | "holders";
 type Status = "all" | "graduated";
+type Kind = "all" | "standard" | "quantum";
+
+const KINDS: { value: Kind; label: string; hint: string }[] = [
+  { value: "all", label: "All coins", hint: "Every pqc.market launch" },
+  { value: "standard", label: "Standard", hint: "Post-quantum provenance, dev funds in a wallet" },
+  { value: "quantum", label: "Quantum", hint: "Hash-based, dev funds locked in a quantum vault" },
+];
 
 export function Home() {
   return (
@@ -73,14 +80,15 @@ function CoinsSection() {
   const [market, setMarket] = useState<Record<string, MarketItem> | null>(null);
   const [sort, setSort] = useState<Sort>("new");
   const [status, setStatus] = useState<Status>("all");
+  const [kind, setKind] = useState<Kind>("all");
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
   // Graduation is filtered on the server across every live launch, not just the loaded page.
   const listUrl = useCallback(
     (offset: number) =>
-      `/api/launches?offset=${offset}${status === "graduated" ? "&status=graduated" : ""}${sort !== "new" ? `&sort=${sort}` : ""}`,
-    [status, sort],
+      `/api/launches?offset=${offset}${status === "graduated" ? "&status=graduated" : ""}${sort !== "new" ? `&sort=${sort}` : ""}${kind !== "all" ? `&kind=${kind}` : ""}`,
+    [status, sort, kind],
   );
 
   useEffect(() => {
@@ -120,6 +128,8 @@ function CoinsSection() {
   statusRef.current = status;
   const sortRef = useRef(sort);
   sortRef.current = sort;
+  const kindRef = useRef(kind);
+  kindRef.current = kind;
 
   // Supabase Realtime: RLS only streams rows once status = live, i.e. when submit confirms.
   useEffect(() => {
@@ -141,6 +151,7 @@ function CoinsSection() {
           leaf_index: row.leaf_index ?? 0,
           message_hash: row.message_hash,
           dev_buy_sol: Number(row.dev_buy_sol ?? 0),
+          dev_vault: row.dev_vault ?? null,
           created_at: row.created_at ?? new Date().toISOString(),
           launched_at: row.launched_at ?? new Date().toISOString(),
           twitter: row.twitter ?? null,
@@ -150,6 +161,7 @@ function CoinsSection() {
           anchored: false,
         };
         if (statusRef.current !== "all" || sortRef.current !== "new") return;
+        if ((kindRef.current === "quantum" && !item.dev_vault) || (kindRef.current === "standard" && item.dev_vault)) return;
         setLaunches((prev) => (prev && !prev.some((l) => l.mint === item.mint) ? [item, ...prev] : prev));
         setFresh((prev) => new Set(prev).add(item.mint));
         timers.push(
@@ -201,9 +213,28 @@ function CoinsSection() {
 
   return (
     <section className="min-h-[110vh] pb-24">
+      <div className="mb-5 flex items-end justify-between gap-4 border-b border-line">
+        <div role="tablist" aria-label="Coin type" className="-mb-px flex gap-6 sm:gap-8">
+          {KINDS.map((k) => (
+            <button
+              key={k.value}
+              role="tab"
+              aria-selected={kind === k.value}
+              title={k.hint}
+              onClick={() => setKind(k.value)}
+              className={cn(
+                "cursor-pointer border-b-2 pb-3 font-serif text-[20px] font-bold leading-none transition-colors sm:text-[24px]",
+                kind === k.value ? "border-fg text-fg" : "border-transparent text-dim hover:text-muted",
+              )}
+            >
+              {k.label}
+            </button>
+          ))}
+        </div>
+        <p className="hidden pb-3 text-right text-[12px] text-dim md:block">{KINDS.find((k) => k.value === kind)?.hint}</p>
+      </div>
       <div className="flex flex-col gap-4 pb-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="font-serif text-[22px] font-bold">Coins</h2>
           <span
             title={live ? "New launches stream in automatically" : "Connecting to live feed"}
             className={cn("flex items-center gap-1.5 font-mono text-[11px]", live ? "text-up" : "text-dim")}
@@ -241,7 +272,7 @@ function CoinsSection() {
           ))}
         </div>
       ) : visible.length === 0 ? (
-        <Empty filtered={status !== "all"} />
+        <Empty filtered={status !== "all" ? "graduated" : kind === "quantum" ? "quantum" : kind === "standard" ? "standard" : null} />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((l) => (
@@ -264,18 +295,20 @@ function CoinsSection() {
   );
 }
 
-function Empty({ filtered }: { filtered: boolean }) {
+function Empty({ filtered }: { filtered: "graduated" | "quantum" | "standard" | null }) {
+  const copy = {
+    graduated: ["Nothing graduated yet", "Coins graduate when their bonding curve fills and liquidity moves to PumpSwap."],
+    quantum: ["No quantum coins yet", "Quantum launches put the dev buy straight into a vault only a hash-based signature can open."],
+    standard: ["No standard coins yet", "Standard launches carry a post-quantum provenance signature with any of the eight schemes."],
+  } as const;
+  const [title, body] = filtered ? copy[filtered] : ["No coins yet", "Be the first to launch a coin with a hash-based, post-quantum provenance signature."];
   return (
     <div className="flex flex-col items-center rounded-2xl border border-dashed border-line px-4 py-20 text-center">
-      <h3 className="font-serif text-[18px] font-bold">{filtered ? "Nothing graduated yet" : "No coins yet"}</h3>
-      <p className="mt-2 max-w-sm text-[13px] text-muted">
-        {filtered
-          ? "Coins graduate when their bonding curve fills and liquidity moves to PumpSwap."
-          : "Be the first to launch a coin with a hash-based, post-quantum provenance signature."}
-      </p>
-      {!filtered && (
+      <h3 className="font-serif text-[18px] font-bold">{title}</h3>
+      <p className="mt-2 max-w-sm text-[13px] text-muted">{body}</p>
+      {filtered !== "graduated" && (
         <ButtonLink href="/launch" variant="primary" className="mt-6">
-          Launch the first coin
+          {filtered === "quantum" ? "Launch a quantum coin" : filtered ? "Launch a coin" : "Launch the first coin"}
         </ButtonLink>
       )}
     </div>

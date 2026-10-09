@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/launch", label: "Launch" },
   { href: "/identity", label: "Identity" },
   { href: "/wallet", label: "Wallet" },
+  { href: "/vault", label: "Vault" },
   { href: "/prove", label: "Verify" },
   { href: "/docs", label: "Docs" },
 ];
@@ -168,6 +169,7 @@ function WalletMenu() {
             <MenuLink href="/identity" onClick={() => setOpen(false)}>
               {remote ? "Identity & keys" : "Set up PQ identity"}
             </MenuLink>
+            <MenuLink href="/vault" onClick={() => setOpen(false)}>Quantum vault</MenuLink>
             <MenuLink href="/prove" onClick={() => setOpen(false)}>Prove & verify</MenuLink>
             <MenuLink href="/launch" onClick={() => setOpen(false)}>Launch a coin</MenuLink>
           </div>

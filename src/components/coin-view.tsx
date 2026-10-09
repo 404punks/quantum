@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Anchor, ArrowUpRight, Check, Fingerprint, Globe, Lock, MessageCircle, Send, X } from "lucide-react";
 import { SCHEMES, isSchemeId } from "@/lib/pq/scheme-info";
 import { verifyLaunch, type LaunchVerification } from "@/lib/pq/verify-launch";
 import type { CurveState } from "@/lib/types";
-import { ago, cn, num, pct, price, short, usd } from "@/lib/format";
+import { ago, cn, coinPath, num, pct, price, short, usd } from "@/lib/format";
 import { LaunchVerificationView } from "./verify-trace";
 import { Button, CopyText, Panel, Pill, Skeleton } from "./ui";
 
@@ -28,6 +29,7 @@ type Payload = {
     scheme: string;
     attestation: unknown;
     dev_buy_sol: number;
+    dev_vault: string | null;
     launched_at: string | null;
     tx_signature: string | null;
   };
@@ -56,7 +58,8 @@ type Payload = {
   solPrice: number | null;
 };
 
-export function CoinView({ mint }: { mint: string }) {
+export function CoinView({ mint, quantumRoute = false }: { mint: string; quantumRoute?: boolean }) {
+  const router = useRouter();
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [chartLoading, setChartLoading] = useState(true);
@@ -82,6 +85,12 @@ export function CoinView({ mint }: { mint: string }) {
       clearInterval(id);
     };
   }, [mint]);
+
+  // Quantum coins live at /coin/q/<mint>, the rest at /coin/<mint>; old links land on the right one.
+  const isQuantum = data ? Boolean(data.launch.dev_vault) : null;
+  useEffect(() => {
+    if (isQuantum !== null && isQuantum !== quantumRoute) router.replace(coinPath(mint, isQuantum));
+  }, [isQuantum, quantumRoute, mint, router]);
 
   const verifiedMint = data?.launch.mint;
   useEffect(() => {
@@ -126,6 +135,11 @@ export function CoinView({ mint }: { mint: string }) {
             </h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <Pill tone="up">{schemeTag}</Pill>
+              {launch.dev_vault && (
+                <Pill tone="up">
+                  <Lock size={10} /> dev buy in quantum vault
+                </Pill>
+              )}
               {identity.anchor_tx && <Pill>anchored root</Pill>}
               {identity.passphrase_hardened && <Pill>hardened</Pill>}
               <CopyText value={launch.mint} display={short(launch.mint, 6, 6)} className="ml-1 text-[11.5px] text-dim" />
@@ -216,6 +230,16 @@ export function CoinView({ mint }: { mint: string }) {
               )}
               <KV k="sig size" v={`${schemeInfo.sigBytes.toLocaleString()} B`} />
               <KV k="dev buy" v={`${launch.dev_buy_sol} SOL`} />
+              {launch.dev_vault && (
+                <KV
+                  k="dev vault"
+                  v={
+                    <a href={`https://solscan.io/account/${launch.dev_vault}`} target="_blank" rel="noreferrer" className="cursor-pointer text-up hover:underline">
+                      {short(launch.dev_vault, 6, 6)}
+                    </a>
+                  }
+                />
+              )}
               <KV k="launched" v={ago(launch.launched_at)} />
             </dl>
             <div className="mt-4 grid grid-cols-2 gap-2">

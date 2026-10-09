@@ -40,3 +40,8 @@ export function ago(iso: string | null | undefined) {
 export function cn(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(" ");
 }
+
+/** A coin's page: quantum launches (dev funds in a vault) live under /coin/q/. */
+export function coinPath(mint: string, quantum?: boolean) {
+  return quantum ? `/coin/q/${mint}` : `/coin/${mint}`;
+}

@@ -1,10 +1,18 @@
-import { bytesToHex } from "@noble/hashes/utils.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
+import {
+  TOKEN_2022_PROGRAM_ID,
+  createAssociatedTokenAccountIdempotentInstruction,
+  createCloseAccountInstruction,
+  createTransferCheckedInstruction,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 import { ComputeBudgetProgram, PublicKey, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import { getBuyTokenAmountFromSolAmount } from "@pump-fun/pump-sdk";
 import BN from "bn.js";
 import { launchDigest } from "@/lib/pq/messages";
 import { SCHEMES, bindingDigest, isSchemeId, schemeVerify, type SchemeAttestation, type SchemeId } from "@/lib/pq/schemes";
 import { verify, type PqSignature } from "@/lib/pq/xmss";
+import { vaultAddress } from "@/lib/vault/vault";
 import { isGatewayUrl, pinMetadata } from "@/lib/server/pinata";
 import {
   LAMPORTS_PER_SOL,
@@ -15,9 +23,10 @@ import {
   pumpSdk,
 } from "@/lib/server/solana";
 import { burnLeaf, db, type IdentityRow } from "@/lib/server/supabase";
-import { bad, cleanUrl, isHexUpTo, isPubkey, parseSignature, publicKeyOf } from "@/lib/server/validate";
+import { bad, cleanUrl, isHex32, isHexUpTo, isPubkey, parseSignature, publicKeyOf } from "@/lib/server/validate";
 
 const MAX_DEV_BUY_SOL = 50;
+const PUMP_DECIMALS = 6;
 
 // On-chain creator for every launch: all creator fees accrue to the treasury vault.
 // Fixed at mint time. Individual launchers cannot claim; a keeper holding the
@@ -49,6 +58,17 @@ export async function POST(request: Request) {
   if (!/^[A-Za-z0-9]{1,10}$/.test(symbol)) return bad("Ticker must be 1–10 letters or digits");
   if (typeof image !== "string" || !isGatewayUrl(image)) return bad("Upload an image first");
   if (!Number.isFinite(devBuySol) || devBuySol < 0 || devBuySol > MAX_DEV_BUY_SOL) return bad("Bad dev buy");
+
+  // Quantum launch: the dev buy is delivered into a pqc-vault. The vault is
+  // given with the key hash it commits to, so we can prove it is a real vault
+  // PDA (spendable only by a WOTS signature) before recording the claim.
+  let devVault: PublicKey | null = null;
+  if (body.vault != null) {
+    if (!isPubkey(body.vault) || !isHex32(body.vaultHash)) return bad("Invalid vault");
+    if (vaultAddress(hexToBytes(body.vaultHash))[0].toBase58() !== body.vault) return bad("That address is not a quantum vault");
+    if (!(devBuySol > 0)) return bad("A quantum launch needs a dev buy to put in the vault");
+    devVault = new PublicKey(body.vault);
+  }
 
   const { data: identity } = await db
     .from("pqc_identities")
@@ -96,7 +116,8 @@ export async function POST(request: Request) {
 
   const twitter = cleanUrl(body.twitter);
   // Locked: every coin links back to its attestation page.
-  const website = `https://pqc.market/coin/${mint}`;
+  const page = `https://pqc.market/coin/${devVault ? "q/" : ""}${mint}`;
+  const website = page;
 
   const metadata = {
     name,
@@ -117,7 +138,7 @@ export async function POST(request: Request) {
       height: identity.height,
       messageHash,
       signature: stored,
-      verify: `https://pqc.market/coin/${mint}`,
+      verify: page,
     },
   };
 
@@ -134,6 +155,10 @@ export async function POST(request: Request) {
 
   const [global, feeConfig] = await Promise.all([fetchGlobal(), onlinePump.fetchFeeConfig().catch(() => null)]);
 
+  const tokenAmount = lamports.isZero()
+    ? new BN(0)
+    : getBuyTokenAmountFromSolAmount({ global, feeConfig, mintSupply: null, bondingCurve: null, amount: lamports, quoteMint: PublicKey.default });
+
   const instructions = lamports.isZero()
     ? [await pumpSdk.createV2Instruction({ mint: mintKey, name, symbol, uri, creator: TREASURY, user, mayhemMode: false })]
     : await pumpSdk.createV2AndBuyInstructions({
@@ -144,17 +169,23 @@ export async function POST(request: Request) {
         uri,
         creator: TREASURY,
         user,
-        amount: getBuyTokenAmountFromSolAmount({
-          global,
-          feeConfig,
-          mintSupply: null,
-          bondingCurve: null,
-          amount: lamports,
-          quoteMint: PublicKey.default,
-        }),
+        amount: tokenAmount,
         solAmount: lamports,
         mayhemMode: false,
       });
+
+  // The buy delivers exactly tokenAmount to the creator's account; in the same
+  // transaction it moves on to the vault and the emptied account is closed
+  // (rent back to the creator). The tokens never rest under an ed25519 key.
+  if (devVault) {
+    const userAta = getAssociatedTokenAddressSync(mintKey, user, true, TOKEN_2022_PROGRAM_ID);
+    const vaultAta = getAssociatedTokenAddressSync(mintKey, devVault, true, TOKEN_2022_PROGRAM_ID);
+    instructions.push(
+      createAssociatedTokenAccountIdempotentInstruction(user, vaultAta, devVault, mintKey, TOKEN_2022_PROGRAM_ID),
+      createTransferCheckedInstruction(userAta, mintKey, vaultAta, user, BigInt(tokenAmount.toString()), PUMP_DECIMALS, [], TOKEN_2022_PROGRAM_ID),
+      createCloseAccountInstruction(userAta, user, user, [], TOKEN_2022_PROGRAM_ID),
+    );
+  }
 
   const [{ blockhash }, alt] = await Promise.all([connection.getLatestBlockhash("confirmed"), pumpLookupTable()]);
   const message = new TransactionMessage({
@@ -166,6 +197,8 @@ export async function POST(request: Request) {
       ...instructions,
     ],
   }).compileToV0Message([alt]);
+  const transaction = new VersionedTransaction(message);
+  if (transaction.serialize().length > 1232) return bad("Transaction too large", 500);
 
   const { error } = await db.from("pqc_launches").insert({
     mint,
@@ -184,6 +217,7 @@ export async function POST(request: Request) {
     message_hash: messageHash,
     attestation: stored,
     dev_buy_sol: devBuySol,
+    dev_vault: devVault?.toBase58() ?? null,
     status: "pending",
   });
   if (error) return bad(error.message, 500);
@@ -191,6 +225,6 @@ export async function POST(request: Request) {
   return Response.json({
     mint,
     uri,
-    transaction: Buffer.from(new VersionedTransaction(message).serialize()).toString("base64"),
+    transaction: Buffer.from(transaction.serialize()).toString("base64"),
   });
 }

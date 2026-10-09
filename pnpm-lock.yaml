@@ -41,6 +41,9 @@ importers:
       bs58:
         specifier: ^6.0.0
         version: 6.0.0
+      buffer:
+        specifier: ^6.0.3
+        version: 6.0.3
       html-to-image:
         specifier: ^1.11.13
         version: 1.11.13

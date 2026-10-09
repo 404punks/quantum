@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import {
+  ArrowRight,
   Check,
   Lock,
   Circle,
@@ -14,22 +15,28 @@ import {
   X,
 } from "lucide-react";
 import { fromBase64, toBase64 } from "@/lib/b64";
-import { cn, short } from "@/lib/format";
+import { cn, coinPath, short } from "@/lib/format";
 import { deriveMintKeypair } from "@/lib/pq/derive";
 import { launchDigest } from "@/lib/pq/messages";
 import { SCHEMES, SCHEME_IDS, schemeSign, type SchemeId } from "@/lib/pq/schemes";
+import { discoverVaults } from "@/lib/vault/app";
 import { CoinCard } from "./coin-card";
 import { DigestGrid } from "./digest-grid";
 import { useIdentity } from "./identity";
 import { GatedButton } from "./unlock";
-import { Panel, Pill } from "./ui";
+import { BigToggle, Panel, Pill } from "./ui";
 
-function stepsFor(scheme: SchemeId, leaf: number, bound: boolean) {
+type VaultTarget = { index: number; address: string; pkHash: string };
+
+function stepsFor(scheme: SchemeId, leaf: number, bound: boolean, vault: VaultTarget | null) {
   const name = SCHEMES[scheme].name;
   const head =
     scheme === "wots"
       ? [`Derive mint keypair from leaf #${leaf}`, `Sign attestation with WOTS leaf #${leaf}`]
       : [bound ? `Load ${name} key (certified by your root)` : `Certify ${name} key with WOTS leaf #${leaf}`, `Sign attestation with ${name}`];
+  if (vault) {
+    return [...head, `Build transaction · dev buy → vault #${vault.index}`, "Approve in wallet", "Broadcast · dev buy lands in your vault"];
+  }
   return [...head, "Verify, pin metadata, build transaction", "Approve in wallet", "Broadcast & confirm"];
 }
 const STEP_COUNT = 5;
@@ -54,6 +61,9 @@ export function LaunchView() {
 function LaunchForm() {
   const { unlocked, wallet, nextLeaf, signWithLeaf, signTransaction, refresh, schemeKeys, ensureSchemeKey } = useIdentity();
   const [scheme, setScheme] = useState<SchemeId>("wots");
+  const [quantum, setQuantum] = useState(false);
+  const [vault, setVault] = useState<VaultTarget | null>(null);
+  const [vaultError, setVaultError] = useState<string | null>(null);
   const [mintNonce, setMintNonce] = useState(0);
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
@@ -71,7 +81,32 @@ function LaunchForm() {
 
   const leaf = nextLeaf;
   const bound = scheme !== "wots" && schemeKeys.some((k) => k.scheme === scheme);
-  const STEPS = stepsFor(scheme, leaf, bound);
+  const STEPS = stepsFor(scheme, leaf, bound, quantum ? vault : null);
+
+  // Quantum mode needs the creator's current vault: the first one that isn't spent.
+  useEffect(() => {
+    if (!quantum || !unlocked) return;
+    let cancelled = false;
+    setVaultError(null);
+    discoverVaults({ skSeed: unlocked.skSeed, pubSeed: unlocked.pubSeed })
+      .then(({ current }) => {
+        if (!cancelled) setVault({ index: current.index, address: current.key.address.toBase58(), pkHash: bytesToHex(current.key.pkHash) });
+      })
+      .catch((err) => !cancelled && setVaultError(err instanceof Error ? err.message : "Could not find your vault"));
+    return () => {
+      cancelled = true;
+    };
+  }, [quantum, unlocked]);
+
+  function chooseMode(next: boolean) {
+    setQuantum(next);
+    setError(null);
+    if (next) {
+      // Hash-based end to end: the same WOTS family signs the coin and guards the vault.
+      setScheme("wots");
+      if (!(Number(devBuy) > 0)) setDevBuy("0.1");
+    }
+  }
   // WOTS launches derive the mint from their one-time leaf; many-time schemes burn no leaf, so they use a fresh keypair.
   const mintKeypair = useMemo(() => {
     if (!unlocked) return null;
@@ -95,7 +130,8 @@ function LaunchForm() {
     Boolean(image) &&
     Number.isFinite(devBuyNum) &&
     devBuyNum >= 0 &&
-    devBuyNum <= 50;
+    devBuyNum <= 50 &&
+    (!quantum || (devBuyNum > 0 && Boolean(vault)));
 
   async function onFile(file: File | undefined) {
     if (!file) return;
@@ -158,6 +194,7 @@ function LaunchForm() {
           devBuySol: devBuyNum,
           scheme,
           attestation,
+          ...(quantum && vault ? { vault: vault.address, vaultHash: vault.pkHash } : {}),
         }),
       }).then((r) => r.json());
       if (prep.error) throw new Error(prep.error);
@@ -180,7 +217,7 @@ function LaunchForm() {
 
       setSteps(Array(STEP_COUNT).fill("done"));
       setResult({ mint, signature: submit.signature, status: submit.status });
-      router.push(`/coin/${mint}`);
+      router.push(coinPath(mint, quantum));
     } catch (err) {
       mark(current, "error");
       setError(err instanceof Error ? err.message : "Launch failed");
@@ -205,7 +242,7 @@ function LaunchForm() {
           <div className="mt-1 flex justify-between gap-3"><span className="text-dim">tx</span>{short(result.signature, 10, 8)}</div>
         </div>
         <div className="mt-6 flex gap-2">
-          <Link href={`/coin/${result.mint}`} className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-fg px-4 py-2 text-[13px] font-medium text-bg hover:bg-white">
+          <Link href={coinPath(result.mint, quantum)} className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-fg px-4 py-2 text-[13px] font-medium text-bg hover:bg-white">
             View coin
           </Link>
           <a href={`https://solscan.io/tx/${result.signature}`} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center rounded-xl border border-line px-4 py-2 text-[13px] hover:border-line-strong hover:bg-surface-2">
@@ -219,7 +256,9 @@ function LaunchForm() {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       <Panel className="p-6">
-        <div className="grid gap-5 sm:grid-cols-[140px_1fr]">
+        <ModeToggle quantum={quantum} onChange={chooseMode} disabled={running} />
+
+        <div className="mt-6 grid gap-5 border-t border-line pt-6 sm:grid-cols-[140px_1fr]">
           <div>
             <Label>Image</Label>
             <button
@@ -299,13 +338,28 @@ function LaunchForm() {
               className="flex h-10 items-center gap-2 overflow-hidden rounded-xl border border-line bg-surface-2 px-3 font-mono text-[12px] text-muted"
             >
               <Lock size={12} className="shrink-0 text-dim" />
-              <span className="truncate">pqc.market/coin/{mint ? short(mint, 6, 6) : "<mint>"}</span>
+              <span className="truncate">pqc.market/coin/{quantum ? "q/" : ""}{mint ? short(mint, 6, 6) : "<mint>"}</span>
             </div>
           </div>
         </div>
 
         <div className="mt-6 border-t border-line pt-5">
           <Label>Signature scheme</Label>
+          {quantum ? (
+            <div className="flex items-start gap-3 border border-line bg-bg px-3 py-3">
+              <Lock size={14} className="mt-0.5 shrink-0 text-muted" />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[13px] font-medium text-fg">WOTS + Merkle</span>
+                  <span className="font-mono text-[10.5px] text-dim">hash-based · SHA-256 only</span>
+                </div>
+                <p className="mt-1 text-[11.5px] leading-relaxed text-muted">
+                  Locked for quantum launches: the coin is signed by the same hash-based family that guards your vault. No lattices,
+                  no curves, one assumption.
+                </p>
+              </div>
+            </div>
+          ) : (
           <div className="grid gap-2 sm:grid-cols-2">
             {SCHEME_IDS.map((id) => {
               const s = SCHEMES[id];
@@ -343,15 +397,16 @@ function LaunchForm() {
               );
             })}
           </div>
+          )}
         </div>
 
         <div className="mt-6 border-t border-line pt-5">
-          <Label>Dev buy (SOL)</Label>
+          <Label>{quantum ? "Dev buy (SOL) → quantum vault" : "Dev buy (SOL)"}</Label>
           <div className="flex flex-wrap items-center gap-2">
             <div className="w-32">
               <Input value={devBuy} onChange={(v) => setDevBuy(v.replace(/[^0-9.]/g, ""))} placeholder="0" mono />
             </div>
-            {["0", "0.1", "0.5", "1", "2"].map((v) => (
+            {(quantum ? ["0.1", "0.5", "1", "2"] : ["0", "0.1", "0.5", "1", "2"]).map((v) => (
               <button
                 key={v}
                 type="button"
@@ -365,7 +420,11 @@ function LaunchForm() {
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[11.5px] text-dim">Bought in the same transaction as the create, so nobody can front-run you.</p>
+          {quantum ? (
+            <VaultDestination vault={vault} error={vaultError} unlocked={Boolean(unlocked)} />
+          ) : (
+            <p className="mt-2 text-[11.5px] text-dim">Bought in the same transaction as the create, so nobody can front-run you.</p>
+          )}
         </div>
 
         <div className="mt-6 border-t border-line pt-5">
@@ -381,7 +440,11 @@ function LaunchForm() {
           </ol>
           {error && <p className="mt-4 text-[12.5px] text-down">{error}</p>}
           <GatedButton className="mt-5 w-full" disabled={!valid || uploading} busy={running} onClick={() => void launch()}>
-            {running ? "Launching…" : `Launch ${symbol ? `$${symbol}` : "coin"}${devBuyNum > 0 ? ` · buy ${devBuyNum} SOL` : ""}`}
+            {running
+              ? "Launching…"
+              : quantum
+                ? `Quantum launch ${symbol ? `${symbol}` : "coin"}${devBuyNum > 0 ? ` · ${devBuyNum} SOL into vault` : ""}`
+                : `Launch ${symbol ? `${symbol}` : "coin"}${devBuyNum > 0 ? ` · buy ${devBuyNum} SOL` : ""}`}
           </GatedButton>
           <p className="mt-2 text-center text-[11px] text-dim">
             pump.fun charges ~0.02 SOL in rent and fees.
@@ -390,6 +453,7 @@ function LaunchForm() {
       </Panel>
 
       <aside className="space-y-4">
+        {quantum && <QuantumChecklist leaf={leaf} vault={vault} hardened={Boolean(unlocked?.hardened)} devBuy={devBuyNum} />}
         <div>
           <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">Preview</div>
           <CoinCard
@@ -402,6 +466,7 @@ function LaunchForm() {
               leaf_index: leaf,
               scheme,
               digest,
+              dev_vault: quantum ? (vault?.address ?? "pending") : null,
             }}
             market={{ price: null, change24h: null, marketCap: null, volume24h: null, holders: null, curve: null, indexed: true }}
           />
@@ -432,6 +497,91 @@ function LaunchForm() {
   );
 }
 
+
+function ModeToggle({ quantum, onChange, disabled }: { quantum: boolean; onChange: (q: boolean) => void; disabled?: boolean }) {
+  return (
+    <div>
+      <Label>Launch mode</Label>
+      <BigToggle
+        label="Launch mode"
+        value={quantum ? "quantum" : "standard"}
+        onChange={(v) => onChange(v === "quantum")}
+        disabled={disabled}
+        options={[
+          { value: "standard", label: "Standard", sub: "PQ provenance · dev buy to your wallet" },
+          { value: "quantum", label: "Quantum", sub: "Hash-based only · dev buy into your vault" },
+        ]}
+      />
+    </div>
+  );
+}
+
+function VaultDestination({ vault, error, unlocked }: { vault: VaultTarget | null; error: string | null; unlocked: boolean }) {
+  return (
+    <div className="mt-3 border border-line bg-[#0b0a0a] p-3 font-mono text-[11.5px] leading-relaxed">
+      {error ? (
+        <span className="text-down">[ ERR ] {error}</span>
+      ) : !unlocked ? (
+        <span className="text-dim">unlock your identity to locate your vault</span>
+      ) : !vault ? (
+        <span className="text-dim">
+          <Loader2 size={11} className="mr-1.5 inline animate-spin" />
+          locating your quantum vault…
+        </span>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-muted">
+              destination <span className="text-fg">vault #{vault.index}</span> {short(vault.address, 6, 6)}
+            </span>
+            <Link href="/vault" className="cursor-pointer text-dim hover:text-fg">
+              open vault <ArrowRight size={10} className="inline" />
+            </Link>
+          </div>
+          <div className="mt-1 text-dim">
+            pump.fun buys the tokens, and the same transaction moves every one of them into your vault. They never rest under an
+            ed25519 key.
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function QuantumChecklist({ leaf, vault, hardened, devBuy }: { leaf: number; vault: VaultTarget | null; hardened: boolean; devBuy: number }) {
+  const rows: { ok: boolean | "warn"; label: string; sub: string }[] = [
+    { ok: true, label: "Hash-based provenance", sub: `WOTS leaf #${leaf} signs mint, name, ticker, image` },
+    { ok: true, label: "Mint from a one-time key", sub: "The mint address is derived from the same leaf" },
+    { ok: devBuy > 0 && Boolean(vault), label: "Dev buy in your quantum vault", sub: vault ? `${devBuy || 0} SOL of tokens → vault #${vault.index}` : "Locating vault…" },
+    { ok: true, label: "Spendable only by WOTS", sub: "The vault program verifies the signature on-chain" },
+    {
+      ok: hardened ? true : "warn",
+      label: hardened ? "Hardened identity" : "Wallet-only identity",
+      sub: hardened ? "Keys don’t depend on ed25519 alone" : "Vault keys re-derivable from your wallet key",
+    },
+  ];
+  return (
+    <Panel className="p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-[11px] uppercase tracking-wider text-dim">Quantum launch</span>
+        <span className="font-mono text-[11px] text-muted">hash-based</span>
+      </div>
+      <ul className="space-y-2.5">
+        {rows.map((r) => (
+          <li key={r.label} className="flex items-start gap-2.5">
+            <span className={cn("mt-0.5 font-mono text-[11px]", r.ok === true ? "text-up" : r.ok === "warn" ? "text-warn" : "text-dim")}>
+              {r.ok === true ? "[✓]" : r.ok === "warn" ? "[!]" : "[ ]"}
+            </span>
+            <div className="min-w-0">
+              <div className="text-[12.5px] text-fg">{r.label}</div>
+              <div className="text-[11px] text-dim">{r.sub}</div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
 
 function StepIcon({ state }: { state: StepState }) {
   if (state === "active") return <Loader2 size={14} className="animate-spin text-fg" />;

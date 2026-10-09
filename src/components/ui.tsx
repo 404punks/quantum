@@ -98,6 +98,69 @@ export function Mono({ children, className }: { children: ReactNode; className?:
   return <span className={cn("font-mono", className)}>{children}</span>;
 }
 
+/** Large sliding radio switch: a white block slides under the selected option. */
+export function BigToggle<T extends string>({
+  value,
+  onChange,
+  options,
+  label,
+  disabled,
+  className,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string; sub: string }[];
+  label: string;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const index = Math.max(0, options.findIndex((o) => o.value === value));
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={cn("relative grid border border-line-strong bg-bg p-1", className)}
+      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+    >
+      <span
+        aria-hidden
+        className="absolute inset-y-1 left-1 bg-fg transition-transform duration-300 ease-out"
+        style={{ width: `calc((100% - 8px) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
+      />
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            disabled={disabled}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "group relative z-10 min-w-0 cursor-pointer px-4 py-3.5 text-left transition-colors disabled:cursor-default sm:px-5 sm:py-4",
+              on ? "text-bg" : "text-muted hover:text-fg",
+            )}
+          >
+            <div className="flex items-center gap-2.5">
+              <span
+                className={cn(
+                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors",
+                  on ? "border-bg" : "border-line-strong group-hover:border-muted",
+                )}
+              >
+                {on && <span className="h-2 w-2 rounded-full bg-bg" />}
+              </span>
+              <span className="truncate font-serif text-[19px] font-bold leading-none sm:text-[21px]">{o.label}</span>
+            </div>
+            <div className={cn("mt-1.5 truncate pl-[26px] font-mono text-[11px]", on ? "text-bg/70" : "text-dim")}>{o.sub}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function Segmented<T extends string>({
   value,
   onChange,

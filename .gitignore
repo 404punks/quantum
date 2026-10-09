@@ -42,3 +42,6 @@ next-env.d.ts
 
 # supabase cli scratch (contains project ref)
 supabase/.temp/
+
+# Vault program handoff notes (test seeds, deploy authority): local only
+HANDOFF.md

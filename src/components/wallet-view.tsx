@@ -51,7 +51,7 @@ const post = (url: string, body: unknown) =>
 const sol = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 4 });
 
 /** Visual fingerprint of an address, same 67-cell grid as the coin attestations. */
-function AddressPrint({ address, className, cellClass = "h-2" }: { address: string; className?: string; cellClass?: string }) {
+export function AddressPrint({ address, className, cellClass = "h-2" }: { address: string; className?: string; cellClass?: string }) {
   const d = useMemo(() => sha256(utf8ToBytes(`pqc.market/wallet-print/${address}`)), [address]);
   return <DigestGrid digest={d} className={className} cellClass={cellClass} />;
 }
@@ -387,12 +387,17 @@ function WalletBody() {
           <div className="space-y-3.5">
             <StatusRow tone="up" label="Post-quantum attestation" value="Every transfer, recorded in the memo" />
             <StatusRow tone="up" label="Keys never stored" value="Re-derived from your identity on unlock" />
-            <StatusRow tone="warn" label="Chain enforces ed25519" value="Funds are guarded by the wallet key today" />
-            <StatusRow tone="off" label="On-chain vault program" value="Next on the roadmap" />
+            <StatusRow tone="warn" label="Chain enforces ed25519" value="These wallets are guarded by their ed25519 key" />
+            <StatusRow tone="up" label="On-chain vault program" value="Live: funds only a WOTS signature can move" />
           </div>
-          <Link href="/docs#wallets" className="mt-4 inline-block cursor-pointer text-[12px] text-muted underline-offset-2 hover:text-fg hover:underline">
-            What this protects today →
-          </Link>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
+            <Link href="/vault" className="inline-block cursor-pointer text-[12px] text-up underline-offset-2 hover:underline">
+              Open the quantum vault →
+            </Link>
+            <Link href="/docs#wallets" className="inline-block cursor-pointer text-[12px] text-muted underline-offset-2 hover:text-fg hover:underline">
+              What this protects →
+            </Link>
+          </div>
         </Panel>
 
         <Panel className="p-5">

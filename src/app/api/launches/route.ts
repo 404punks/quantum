@@ -3,7 +3,7 @@ import { rankMints, type RankSort } from "@/lib/server/ranking";
 import { db } from "@/lib/server/supabase";
 
 const COLUMNS =
-  "mint, name, symbol, description, image_url, creator, pq_address, leaf_index, scheme, message_hash, dev_buy_sol, created_at, launched_at, twitter, telegram, website, pqc_identities(passphrase_hardened, anchor_tx)";
+  "mint, name, symbol, description, image_url, creator, pq_address, leaf_index, scheme, message_hash, dev_buy_sol, dev_vault, created_at, launched_at, twitter, telegram, website, pqc_identities(passphrase_hardened, anchor_tx)";
 
 const PAGE = 48;
 const SORTS = new Set<RankSort>(["mcap", "volume", "holders"]);
@@ -19,6 +19,7 @@ function shape(rows: Row[]) {
 
 /**
  * Live launches, paginated with `offset`.
+ * - `kind=quantum|standard` splits on whether the dev buy went into a quantum vault.
  * - `status=graduated` filters across every live launch (graduation lives on-chain).
  * - `sort=mcap|volume|holders` ranks every matching launch on the server, so the
  *   first page really is the top of the list; default is newest first.
@@ -39,6 +40,10 @@ export async function GET(request: Request) {
     idQuery = idQuery.or(`name.ilike.%${safe}%,symbol.ilike.%${safe}%,mint.eq.${safe}`);
   }
   if (creator) idQuery = idQuery.eq("creator", creator);
+  // Quantum launches delivered their dev buy into a pqc-vault.
+  const kind = params.get("kind");
+  if (kind === "quantum") idQuery = idQuery.not("dev_vault", "is", null);
+  else if (kind === "standard") idQuery = idQuery.is("dev_vault", null);
   const { data: ids, error: idError } = await idQuery;
   if (idError) return Response.json({ error: idError.message }, { status: 500 });
   let mints = (ids ?? []).map((r) => r.mint as string);
