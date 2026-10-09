@@ -20,6 +20,7 @@ import { deriveMintKeypair } from "@/lib/pq/derive";
 import { launchDigest } from "@/lib/pq/messages";
 import { SCHEMES, SCHEME_IDS, schemeSign, type SchemeId } from "@/lib/pq/schemes";
 import { discoverVaults } from "@/lib/vault/app";
+import { PairIcon, PairPicker, SOL_PAIR, useSwapEstimate, type Pair } from "./pair-picker";
 import { CoinCard } from "./coin-card";
 import { DigestGrid } from "./digest-grid";
 import { useIdentity } from "./identity";
@@ -28,12 +29,20 @@ import { BigToggle, Panel, Pill } from "./ui";
 
 type VaultTarget = { index: number; address: string; pkHash: string };
 
-function stepsFor(scheme: SchemeId, leaf: number, bound: boolean, vault: VaultTarget | null) {
+function stepsFor(scheme: SchemeId, leaf: number, bound: boolean, vault: VaultTarget | null, swapTo: string | null) {
   const name = SCHEMES[scheme].name;
   const head =
     scheme === "wots"
       ? [`Derive mint keypair from leaf #${leaf}`, `Sign attestation with WOTS leaf #${leaf}`]
       : [bound ? `Load ${name} key (certified by your root)` : `Certify ${name} key with WOTS leaf #${leaf}`, `Sign attestation with ${name}`];
+  if (swapTo) {
+    return [
+      ...head,
+      `Build · swap SOL → ${swapTo} via Jupiter, then create${vault ? ` · dev buy → vault #${vault.index}` : ""}`,
+      "Approve both transactions in wallet",
+      `Broadcast swap, then launch`,
+    ];
+  }
   if (vault) {
     return [...head, `Build transaction · dev buy → vault #${vault.index}`, "Approve in wallet", "Broadcast · dev buy lands in your vault"];
   }
@@ -59,7 +68,8 @@ export function LaunchView() {
 }
 
 function LaunchForm() {
-  const { unlocked, wallet, nextLeaf, signWithLeaf, signTransaction, refresh, schemeKeys, ensureSchemeKey } = useIdentity();
+  const { unlocked, wallet, nextLeaf, signWithLeaf, signTransaction, signAllTransactions, refresh, schemeKeys, ensureSchemeKey } = useIdentity();
+  const [pair, setPair] = useState<Pair>(SOL_PAIR);
   const [scheme, setScheme] = useState<SchemeId>("wots");
   const [quantum, setQuantum] = useState(false);
   const [vault, setVault] = useState<VaultTarget | null>(null);
@@ -81,7 +91,11 @@ function LaunchForm() {
 
   const leaf = nextLeaf;
   const bound = scheme !== "wots" && schemeKeys.some((k) => k.scheme === scheme);
-  const STEPS = stepsFor(scheme, leaf, bound, quantum ? vault : null);
+  const devBuyValue = Number(devBuy);
+  const tokenPair = pair.category !== "sol";
+  const swapping = tokenPair && devBuyValue > 0;
+  const STEPS = stepsFor(scheme, leaf, bound, quantum ? vault : null, swapping ? pair.symbol : null);
+  const swap = useSwapEstimate(pair, swapping ? devBuyValue : 0);
 
   // Quantum mode needs the creator's current vault: the first one that isn't spent.
   useEffect(() => {
@@ -131,7 +145,8 @@ function LaunchForm() {
     Number.isFinite(devBuyNum) &&
     devBuyNum >= 0 &&
     devBuyNum <= 50 &&
-    (!quantum || (devBuyNum > 0 && Boolean(vault)));
+    (!quantum || (devBuyNum > 0 && Boolean(vault))) &&
+    !(pair.category !== "sol" && devBuyNum > 0 && !swap.estimate);
 
   async function onFile(file: File | undefined) {
     if (!file) return;
@@ -195,6 +210,7 @@ function LaunchForm() {
           scheme,
           attestation,
           ...(quantum && vault ? { vault: vault.address, vaultHash: vault.pkHash } : {}),
+          ...(tokenPair ? { quoteMint: pair.mint } : {}),
         }),
       }).then((r) => r.json());
       if (prep.error) throw new Error(prep.error);
@@ -202,16 +218,16 @@ function LaunchForm() {
       void refresh();
 
       mark((current = 3), "active");
-      const tx = VersionedTransaction.deserialize(fromBase64(prep.transaction));
-      // Mint signs first; wallets leave existing signatures intact.
-      tx.sign([mintKeypair]);
-      const signed = await signTransaction(tx);
+      const txs = ((prep.transactions as string[] | undefined) ?? [prep.transaction as string]).map((b) => VersionedTransaction.deserialize(fromBase64(b)));
+      // The launch (last) is signed by the mint first; wallets leave existing signatures intact.
+      txs[txs.length - 1].sign([mintKeypair]);
+      const signed = txs.length > 1 ? await signAllTransactions(txs) : [await signTransaction(txs[0])];
 
       mark((current = 4), "active");
       const submit = await fetch("/api/launch/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mint, signedTransaction: toBase64(signed.serialize()) }),
+        body: JSON.stringify({ mint, signedTransactions: signed.map((t) => toBase64(t.serialize())) }),
       }).then((r) => r.json());
       if (submit.error) throw new Error(submit.error);
 
@@ -401,6 +417,24 @@ function LaunchForm() {
         </div>
 
         <div className="mt-6 border-t border-line pt-5">
+          <div className="mb-1.5 flex items-center justify-between gap-3">
+            <label className="text-[12px] font-medium text-muted">Pair with</label>
+            <span className="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px] text-dim">
+              <PairIcon pair={pair} size={16} />
+              <span className="truncate">
+                ${symbol || "TICKER"} / <span className="text-fg">{pair.symbol}</span>
+              </span>
+            </span>
+          </div>
+          <PairPicker value={pair} onChange={setPair} disabled={running} />
+          <p className="mt-2 text-[11.5px] text-dim">
+            {tokenPair
+              ? `Your coin trades against ${pair.symbol} on pump.fun. You still pay in SOL: it's swapped for you.`
+              : "Your coin trades against SOL, the pump.fun default. Pick a stock or token to pair with it instead."}
+          </p>
+        </div>
+
+        <div className="mt-6 border-t border-line pt-5">
           <Label>{quantum ? "Dev buy (SOL) → quantum vault" : "Dev buy (SOL)"}</Label>
           <div className="flex flex-wrap items-center gap-2">
             <div className="w-32">
@@ -420,9 +454,10 @@ function LaunchForm() {
               </button>
             ))}
           </div>
+          {swapping && <SwapPreview pair={pair} sol={devBuyValue} {...swap} />}
           {quantum ? (
             <VaultDestination vault={vault} error={vaultError} unlocked={Boolean(unlocked)} />
-          ) : (
+          ) : swapping ? null : (
             <p className="mt-2 text-[11.5px] text-dim">Bought in the same transaction as the create, so nobody can front-run you.</p>
           )}
         </div>
@@ -443,8 +478,8 @@ function LaunchForm() {
             {running
               ? "Launching…"
               : quantum
-                ? `Quantum launch ${symbol ? `${symbol}` : "coin"}${devBuyNum > 0 ? ` · ${devBuyNum} SOL into vault` : ""}`
-                : `Launch ${symbol ? `${symbol}` : "coin"}${devBuyNum > 0 ? ` · buy ${devBuyNum} SOL` : ""}`}
+                ? `Quantum launch ${symbol ? `${symbol}` : "coin"}${devBuyNum > 0 ? ` · ${devBuyNum} SOL${swapping ? ` → ${pair.symbol}` : ""} into vault` : ""}`
+                : `Launch ${symbol ? `${symbol}` : "coin"}${tokenPair ? ` / ${pair.symbol}` : ""}${devBuyNum > 0 ? ` · buy ${devBuyNum} SOL${swapping ? ` → ${pair.symbol}` : ""}` : ""}`}
           </GatedButton>
           <p className="mt-2 text-center text-[11px] text-dim">
             pump.fun charges ~0.02 SOL in rent and fees.
@@ -467,6 +502,8 @@ function LaunchForm() {
               scheme,
               digest,
               dev_vault: quantum ? (vault?.address ?? "pending") : null,
+              quote_symbol: tokenPair ? pair.symbol : null,
+              quote_image: tokenPair ? pair.image : null,
             }}
             market={{ price: null, change24h: null, marketCap: null, volume24h: null, holders: null, curve: null, indexed: true }}
           />
@@ -512,6 +549,50 @@ function ModeToggle({ quantum, onChange, disabled }: { quantum: boolean; onChang
           { value: "quantum", label: "Quantum", sub: "Hash-based only · dev buy into your vault" },
         ]}
       />
+    </div>
+  );
+}
+
+function SwapPreview({
+  pair,
+  sol,
+  estimate,
+  error,
+  loading,
+}: {
+  pair: Pair;
+  sol: number;
+  estimate: { out: number; minOut: number; priceImpactPct: number; route: string[] } | null;
+  error: string | null;
+  loading: boolean;
+}) {
+  const fmt = (n: number) => n.toLocaleString("en-US", { maximumSignificantDigits: 6 });
+  return (
+    <div className="mt-3 border border-line bg-bg p-3 font-mono text-[11.5px] leading-relaxed">
+      {error ? (
+        <span className="text-down">[ ERR ] {error}</span>
+      ) : !estimate ? (
+        <span className="text-dim">
+          {loading && <Loader2 size={11} className="mr-1.5 inline animate-spin" />}
+          finding the best SOL → {pair.symbol} route…
+        </span>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-muted">
+              {sol} SOL <ArrowRight size={11} className="text-dim" />
+              <PairIcon pair={pair} size={14} />
+              <span className="text-fg">≈ {fmt(estimate.out)} {pair.symbol}</span>
+            </span>
+            <span className="text-dim">via Jupiter{estimate.route.length ? ` · ${estimate.route.join(" › ")}` : ""}</span>
+          </div>
+          <div className="mt-1 text-dim">
+            min {fmt(estimate.minOut)} {pair.symbol} · impact {estimate.priceImpactPct < 0.01 ? "<0.01" : estimate.priceImpactPct.toFixed(2)}% · the dev buy spends exactly the
+            guaranteed minimum
+          </div>
+          <div className="mt-1 text-dim">one approval · the swap confirms first, then the launch goes out</div>
+        </>
+      )}
     </div>
   );
 }

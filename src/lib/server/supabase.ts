@@ -40,6 +40,9 @@ export type LaunchRow = {
   attestation: unknown;
   dev_buy_sol: number;
   dev_vault: string | null;
+  quote_mint: string | null;
+  quote_symbol: string | null;
+  quote_image: string | null;
   status: "pending" | "live" | "failed";
   tx_signature: string | null;
   created_at: string;

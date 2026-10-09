@@ -6,13 +6,23 @@ import {
   createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { ComputeBudgetProgram, PublicKey, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
+import {
+  ComputeBudgetProgram,
+  PublicKey,
+  TransactionMessage,
+  VersionedTransaction,
+  type AddressLookupTableAccount,
+  type TransactionInstruction,
+} from "@solana/web3.js";
 import { getBuyTokenAmountFromSolAmount } from "@pump-fun/pump-sdk";
 import BN from "bn.js";
 import { launchDigest } from "@/lib/pq/messages";
 import { SCHEMES, bindingDigest, isSchemeId, schemeVerify, type SchemeAttestation, type SchemeId } from "@/lib/pq/schemes";
 import { verify, type PqSignature } from "@/lib/pq/xmss";
 import { vaultAddress } from "@/lib/vault/vault";
+import { quoteSolTo, swapInstructions, type SwapQuote } from "@/lib/server/jupiter";
+import { checkPair, isSolQuote, resolvePumpPair, type QuoteToken } from "@/lib/server/quotes";
+import { lookupTableFor, lookupTablesEnabled, pairStaticKeys } from "@/lib/server/lookup";
 import { isGatewayUrl, pinMetadata } from "@/lib/server/pinata";
 import {
   LAMPORTS_PER_SOL,
@@ -68,6 +78,30 @@ export async function POST(request: Request) {
     if (vaultAddress(hexToBytes(body.vaultHash))[0].toBase58() !== body.vault) return bad("That address is not a quantum vault");
     if (!(devBuySol > 0)) return bad("A quantum launch needs a dev buy to put in the vault");
     devVault = new PublicKey(body.vault);
+  }
+
+  // Pair: SOL (default) or any quote pump.fun accepts. A dev buy on a token pair
+  // is paid in SOL and swapped through Jupiter inside the launch.
+  const quoteMint = typeof body.quoteMint === "string" && !isSolQuote(body.quoteMint) ? body.quoteMint : null;
+  let pair: QuoteToken | null = null;
+  let swapQuote: SwapQuote | null = null;
+  if (quoteMint) {
+    if (!isPubkey(quoteMint)) return bad("Invalid pair");
+    const check = await checkPair(quoteMint).catch(() => null);
+    if (!check?.ok) return bad(check?.reason ?? "pump.fun doesn't accept that token as a pair");
+    pair = check.token;
+    // A pump.fun-coin pair needs its curve and pool accounts; with a dev buy into a vault
+    // the launch no longer fits one transaction. Refuse before any key is spent.
+    if (devVault && pair.category === "pump" && devBuySol > 0 && !lookupTablesEnabled()) {
+      return bad(`A quantum launch can't pair with a pump.fun coin like ${pair.symbol} (the transaction is too large). Use a standard launch, or pair with SOL or a listed token.`);
+    }
+    if (devBuySol > 0) {
+      try {
+        swapQuote = await quoteSolTo(quoteMint, BigInt(Math.round(devBuySol * LAMPORTS_PER_SOL)));
+      } catch (err) {
+        return bad(err instanceof Error ? err.message : `Can't swap SOL to ${pair.symbol} right now`, 502);
+      }
+    }
   }
 
   const { data: identity } = await db
@@ -155,24 +189,68 @@ export async function POST(request: Request) {
 
   const [global, feeConfig] = await Promise.all([fetchGlobal(), onlinePump.fetchFeeConfig().catch(() => null)]);
 
-  const tokenAmount = lamports.isZero()
-    ? new BN(0)
-    : getBuyTokenAmountFromSolAmount({ global, feeConfig, mintSupply: null, bondingCurve: null, amount: lamports, quoteMint: PublicKey.default });
+  let tokenAmount = new BN(0);
+  let instructions: TransactionInstruction[];
+  let pairBuild: ((mint: PublicKey, user: PublicKey) => Promise<TransactionInstruction[]>) | null = null;
+  let swap: { instructions: TransactionInstruction[]; tables: AddressLookupTableAccount[] } | null = null;
 
-  const instructions = lamports.isZero()
-    ? [await pumpSdk.createV2Instruction({ mint: mintKey, name, symbol, uri, creator: TREASURY, user, mayhemMode: false })]
-    : await pumpSdk.createV2AndBuyInstructions({
-        global,
-        mint: mintKey,
-        name,
-        symbol,
-        uri,
-        creator: TREASURY,
-        user,
-        amount: tokenAmount,
-        solAmount: lamports,
-        mayhemMode: false,
-      });
+  if (pair) {
+    // Token pair. The dev buy spends exactly the swap's guaranteed minimum output,
+    // so it can never ask for more of the token than the swap delivered.
+    const quotePk = new PublicKey(pair.mint);
+    const quoteTokenProgram = new PublicKey(pair.tokenProgram);
+    const quoteControl = await onlinePump.fetchQuoteControl().catch(() => null);
+    // A pump.fun coin off the list seeds the new curve from its live price; resolve it fresh.
+    const pumpQuote = pair.category === "pump" ? await resolvePumpPair(pair.mint).catch(() => null) : null;
+    if (pair.category === "pump" && !pumpQuote) return bad("pump.fun won't accept that coin as a pair right now");
+    if (swapQuote) {
+      try {
+        swap = await swapInstructions(swapQuote, user);
+      } catch (err) {
+        return bad(err instanceof Error ? err.message : "Jupiter swap build failed", 502);
+      }
+      const quoteIn = new BN(swapQuote.otherAmountThreshold);
+      tokenAmount = getBuyTokenAmountFromSolAmount({ global, feeConfig, mintSupply: null, bondingCurve: null, amount: quoteIn, quoteMint: quotePk, quoteControl, pumpQuote: pumpQuote?.curve });
+      const amount = tokenAmount;
+      pairBuild = (m, u) =>
+        pumpSdk.createV2AndBuyV2Instructions({
+          global,
+          mint: m,
+          name,
+          symbol,
+          uri,
+          creator: TREASURY,
+          user: u,
+          amount,
+          quoteAmount: quoteIn,
+          mayhemMode: false,
+          quoteMint: quotePk,
+          quoteTokenProgram,
+          pumpQuote: pumpQuote?.accounts,
+        });
+    } else {
+      pairBuild = async (m, u) => [
+        await pumpSdk.createV2Instruction({ mint: m, name, symbol, uri, creator: TREASURY, user: u, mayhemMode: false, quoteMint: quotePk, quoteTokenProgram, pumpQuote: pumpQuote?.accounts }),
+      ];
+    }
+    instructions = await pairBuild(mintKey, user);
+  } else if (lamports.isZero()) {
+    instructions = [await pumpSdk.createV2Instruction({ mint: mintKey, name, symbol, uri, creator: TREASURY, user, mayhemMode: false })];
+  } else {
+    tokenAmount = getBuyTokenAmountFromSolAmount({ global, feeConfig, mintSupply: null, bondingCurve: null, amount: lamports, quoteMint: PublicKey.default });
+    instructions = await pumpSdk.createV2AndBuyInstructions({
+      global,
+      mint: mintKey,
+      name,
+      symbol,
+      uri,
+      creator: TREASURY,
+      user,
+      amount: tokenAmount,
+      solAmount: lamports,
+      mayhemMode: false,
+    });
+  }
 
   // The buy delivers exactly tokenAmount to the creator's account; in the same
   // transaction it moves on to the vault and the emptied account is closed
@@ -188,17 +266,49 @@ export async function POST(request: Request) {
   }
 
   const [{ blockhash }, alt] = await Promise.all([connection.getLatestBlockhash("confirmed"), pumpLookupTable()]);
-  const message = new TransactionMessage({
-    payerKey: user,
-    recentBlockhash: blockhash,
-    instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 200_000 }),
-      ...instructions,
-    ],
-  }).compileToV0Message([alt]);
-  const transaction = new VersionedTransaction(message);
-  if (transaction.serialize().length > 1232) return bad("Transaction too large", 500);
+  const build = (ixs: TransactionInstruction[], units: number, tables: AddressLookupTableAccount[]) => {
+    const tx = new VersionedTransaction(
+      new TransactionMessage({
+        payerKey: user,
+        recentBlockhash: blockhash,
+        instructions: [ComputeBudgetProgram.setComputeUnitLimit({ units }), ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 200_000 }), ...ixs],
+      }).compileToV0Message(tables),
+    );
+    try {
+      return tx.serialize().length <= 1232 ? tx : null;
+    } catch {
+      return null; // over the packet limit
+    }
+  };
+
+  // Token pairs are heavy (~500k CU for create + buy_v2). Prefer one atomic
+  // transaction (swap + create + buy: all or nothing); fall back to swap first,
+  // then the launch, when the route is too big to share a packet.
+  const units = pair ? (swap ? 1_000_000 : 400_000) : 300_000;
+  const assemble = (launchTables: AddressLookupTableAccount[]): VersionedTransaction[] | null => {
+    const single = build([...(swap?.instructions ?? []), ...instructions], units, [...launchTables, ...(swap?.tables ?? [])]);
+    if (single) return [single];
+    if (!swap) return null;
+    const swapTx = build(swap.instructions, 400_000, swap.tables);
+    const launchTx = build(instructions, 600_000, launchTables);
+    return swapTx && launchTx ? [swapTx, launchTx] : null;
+  };
+
+  let transactions = assemble([alt]);
+  // Too big (e.g. a pump.fun-coin pair plus a quantum-vault dev buy): put this
+  // pair's own accounts in our lookup table, once per pair, and try again.
+  // Launches that already fit never touch the table.
+  if (!transactions && pairBuild && lookupTablesEnabled()) {
+    try {
+      const table = await lookupTableFor(await pairStaticKeys(pairBuild));
+      if (table) transactions = assemble([alt, table]);
+    } catch (err) {
+      console.warn("lookup table:", err instanceof Error ? err.message : err);
+    }
+  }
+  if (!transactions) {
+    return bad(devVault ? `Pairing with ${pair?.symbol ?? "this token"} and a quantum vault together doesn't fit in one Solana transaction. Use a standard launch for this pair.` : "Transaction too large", 400);
+  }
 
   const { error } = await db.from("pqc_launches").insert({
     mint,
@@ -218,13 +328,18 @@ export async function POST(request: Request) {
     attestation: stored,
     dev_buy_sol: devBuySol,
     dev_vault: devVault?.toBase58() ?? null,
+    quote_mint: pair?.mint ?? null,
+    quote_symbol: pair?.symbol ?? null,
+    quote_image: pair?.image ?? null,
     status: "pending",
   });
   if (error) return bad(error.message, 500);
 
+  // The last transaction is the launch (the mint keypair signs it); any before it is the swap.
   return Response.json({
     mint,
     uri,
-    transaction: Buffer.from(transaction.serialize()).toString("base64"),
+    transactions: transactions.map((tx) => Buffer.from(tx.serialize()).toString("base64")),
+    swap: swapQuote && pair ? { symbol: pair.symbol, minOut: Number(swapQuote.otherAmountThreshold) / 10 ** pair.decimals, atomic: transactions.length === 1 } : null,
   });
 }

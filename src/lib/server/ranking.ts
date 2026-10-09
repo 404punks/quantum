@@ -1,34 +1,17 @@
 import "server-only";
-import { bondingCurvePda, bondingCurveMarketCap } from "@pump-fun/pump-sdk";
-import { NATIVE_MINT } from "@solana/spl-token";
-import { PublicKey } from "@solana/web3.js";
 import { cached } from "./cache";
+import { curveMarketCapsUsd } from "./curve-usd";
 import { dexStatsChecked, solPrice } from "./dexscreener";
 import { holderCounts } from "./holders";
-import { LAMPORTS_PER_SOL, connection, pumpSdk } from "./solana";
+import { curveStates, type CurveState } from "./solana";
 
 export type RankSort = "mcap" | "volume" | "holders";
 
-/** Bonding-curve market cap in USD for coins DexScreener didn't return (chunked: max 100 accounts per RPC call). */
-async function curveMarketCaps(mints: string[], sol: number): Promise<Record<string, number>> {
-  const out: Record<string, number> = {};
-  for (let i = 0; i < mints.length; i += 100) {
-    const chunk = mints.slice(i, i + 100);
-    const infos = await connection.getMultipleAccountsInfo(chunk.map((m) => bondingCurvePda(m)));
-    infos.forEach((info, j) => {
-      const c = info ? pumpSdk.decodeBondingCurveNullable(info) : null;
-      if (!c || c.virtualTokenReserves.isZero()) return;
-      // Only SOL-quoted curves can be priced from lamport reserves.
-      if (!c.quoteMint.equals(PublicKey.default) && !c.quoteMint.equals(NATIVE_MINT)) return;
-      const lamports = bondingCurveMarketCap({
-        mintSupply: c.tokenTotalSupply,
-        virtualQuoteReserves: c.virtualQuoteReserves,
-        virtualTokenReserves: c.virtualTokenReserves,
-      }).toNumber();
-      out[chunk[j]] = (lamports / LAMPORTS_PER_SOL) * sol;
-    });
-  }
-  return out;
+/** Curve states in batches of 100 (getMultipleAccounts' limit). */
+async function curvesFor(mints: string[]): Promise<Record<string, CurveState>> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < mints.length; i += 100) chunks.push(mints.slice(i, i + 100));
+  return Object.assign({}, ...(await Promise.all(chunks.map((c) => curveStates(c)))));
 }
 
 /**
@@ -49,11 +32,12 @@ async function metric(mints: string[], sort: RankSort): Promise<{ values: Record
   }
   if (sort === "volume") return { values, complete: !incomplete };
 
-  // Market cap: anything DexScreener didn't return is priced from its bonding curve.
+  // Market cap: anything DexScreener didn't return is priced from its bonding
+  // curve, SOL-paired or token-paired (via the pair token's USD price).
   const missing = mints.filter((m) => values[m] === undefined);
   if (missing.length) {
-    const sol = await solPrice().catch(() => null);
-    if (sol) Object.assign(values, await curveMarketCaps(missing, sol).catch(() => ({})));
+    const [sol, curves] = await Promise.all([solPrice().catch(() => null), curvesFor(missing).catch(() => ({}) as Record<string, CurveState>)]);
+    Object.assign(values, await curveMarketCapsUsd(curves, sol).catch(() => ({})));
   }
   const stillMissing = mints.filter((m) => values[m] === undefined).length;
   return { values, complete: !incomplete && stillMissing <= Math.max(2, mints.length * 0.02) };

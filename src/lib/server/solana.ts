@@ -1,4 +1,5 @@
 import "server-only";
+import { NATIVE_MINT } from "@solana/spl-token";
 import { Connection, PublicKey, type AddressLookupTableAccount } from "@solana/web3.js";
 import { OnlinePumpSdk, PumpSdk, bondingCurvePda, bondingCurveMarketCap } from "@pump-fun/pump-sdk";
 import { cached } from "./cache";
@@ -28,13 +29,17 @@ export function fetchGlobal() {
 export type CurveState = {
   progress: number; // 0..1
   complete: boolean;
-  marketCapSol: number;
+  /** Null for curves quoted in a token other than SOL (their reserves are not lamports). */
+  marketCapSol: number | null;
+  /** Token-paired curves: the pair mint and the curve's market cap in its raw base units (see curveMarketCapsUsd). */
+  quoteMint: string | null;
+  marketCapQuoteRaw: number | null;
 };
 
 /** Curve state for many mints in one RPC round trip. Missing curves are omitted. */
 export async function curveStates(mints: string[]): Promise<Record<string, CurveState>> {
   if (!mints.length) return {};
-  const key = `curves:${[...mints].sort().join(",")}`;
+  const key = `curves:v2:${[...mints].sort().join(",")}`;
   return cached(key, 15_000, async () => {
     const global = await fetchGlobal();
     const infos = await connection.getMultipleAccountsInfo(mints.map((m) => bondingCurvePda(m)));
@@ -45,17 +50,21 @@ export async function curveStates(mints: string[]): Promise<Record<string, Curve
       const curve = pumpSdk.decodeBondingCurveNullable(info);
       if (!curve) return;
       const sold = initial.sub(curve.realTokenReserves);
-      const mcap = curve.virtualTokenReserves.isZero()
+      const solQuoted = curve.quoteMint.equals(PublicKey.default) || curve.quoteMint.equals(NATIVE_MINT);
+      const raw = curve.virtualTokenReserves.isZero()
         ? 0
         : bondingCurveMarketCap({
             mintSupply: curve.tokenTotalSupply,
             virtualQuoteReserves: curve.virtualQuoteReserves,
             virtualTokenReserves: curve.virtualTokenReserves,
-          }).toNumber() / LAMPORTS_PER_SOL;
+          }).toNumber();
+      const mcap = solQuoted ? raw / LAMPORTS_PER_SOL : null;
       out[mints[i]] = {
         complete: curve.complete,
         progress: curve.complete ? 1 : Math.max(0, Math.min(1, sold.toNumber() / initial.toNumber())),
         marketCapSol: mcap,
+        quoteMint: solQuoted ? null : curve.quoteMint.toBase58(),
+        marketCapQuoteRaw: solQuoted ? null : raw,
       };
     });
     return out;

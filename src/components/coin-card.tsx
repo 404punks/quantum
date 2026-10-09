@@ -9,7 +9,7 @@ import { DigestGrid } from "./digest-grid";
 import { Skeleton } from "./ui";
 
 type CardLaunch = Pick<LaunchItem, "mint" | "name" | "symbol" | "image_url" | "leaf_index"> &
-  Partial<Pick<LaunchItem, "launched_at" | "message_hash" | "scheme" | "dev_vault">> & { digest?: Uint8Array };
+  Partial<Pick<LaunchItem, "launched_at" | "message_hash" | "scheme" | "dev_vault" | "quote_symbol" | "quote_image">> & { digest?: Uint8Array };
 
 export function CoinCard({
   launch,
@@ -52,7 +52,16 @@ export function CoinCard({
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-[15px] font-semibold text-fg group-hover:underline">{launch.name || "Untitled"}</h3>
-          <div className="mt-0.5 font-mono text-[12px] text-muted">${launch.symbol || "TICKER"}</div>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 font-mono text-[12px] text-muted">
+            <span className="truncate">${launch.symbol || "TICKER"}</span>
+            {launch.quote_symbol && (
+              <span className="flex shrink-0 items-center gap-1 text-dim" title={`Paired with ${launch.quote_symbol}`}>
+                /
+                {launch.quote_image && <img src={launch.quote_image} alt="" className="h-3.5 w-3.5 rounded-full" loading="lazy" />}
+                <span className="text-muted">{launch.quote_symbol}</span>
+              </span>
+            )}
+          </div>
           <div className="mt-1.5 truncate font-mono text-[11px] text-dim">
             {schemeLabel(launch.scheme, launch.leaf_index)}
             {launch.launched_at && <> · {ago(launch.launched_at)}</>}

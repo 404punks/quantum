@@ -1,5 +1,6 @@
 import { ohlcv } from "@/lib/server/birdeye";
 import { cached } from "@/lib/server/cache";
+import { curveMarketCapsUsd } from "@/lib/server/curve-usd";
 import { dexStats, solPrice } from "@/lib/server/dexscreener";
 import { poolCandles, type Timeframe } from "@/lib/server/geckoterminal";
 import { holderCount } from "@/lib/server/holders";
@@ -81,6 +82,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]
     solPrice().catch(() => null),
   ]);
   const d = stats[mint];
+  // Coins paired with a token aren't priced by data providers yet: use the curve.
+  const curveUsd = d?.marketCap ? null : ((await curveMarketCapsUsd(curves, sol).catch(() => ({}) as Record<string, number>))[mint] ?? null);
   // candlesOk=false means every chart source failed (not "no trades"), so the page keeps what it has.
   let candlesOk = true;
   const candles = await chartCandles(mint, d?.pair ?? null, range).catch(() => {
@@ -88,10 +91,10 @@ export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]
     return [];
   });
   const overview =
-    d || holders !== null
+    d || holders !== null || curveUsd !== null
       ? {
-          price: d?.price ?? null,
-          marketCap: d?.marketCap ?? null,
+          price: d?.price ?? (curveUsd !== null ? curveUsd / 1_000_000_000 : null),
+          marketCap: d?.marketCap ?? curveUsd,
           liquidity: d?.liquidity ?? null,
           holder: holders,
           v24hUSD: d?.volume24h ?? null,

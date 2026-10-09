@@ -1,3 +1,4 @@
+import { curveMarketCapsUsd } from "@/lib/server/curve-usd";
 import { dexStats, solPrice } from "@/lib/server/dexscreener";
 import { holderCounts } from "@/lib/server/holders";
 import { curveStates } from "@/lib/server/solana";
@@ -22,17 +23,17 @@ export async function GET(request: Request) {
     solPrice().catch(() => null),
   ]);
 
+  const curveUsd = await curveMarketCapsUsd(curves, sol).catch(() => ({}) as Record<string, number>);
   const tokens = Object.fromEntries(
     mints.map((mint) => {
       const d = stats[mint];
       const curve = curves[mint] ?? null;
-      const mcapFromCurve = curve && sol ? curve.marketCapSol * sol : null;
       return [
         mint,
         {
           price: d?.price ?? null,
           change24h: d?.change24h ?? null,
-          marketCap: d?.marketCap ?? mcapFromCurve,
+          marketCap: d?.marketCap ?? curveUsd[mint] ?? null,
           volume24h: d?.volume24h ?? null,
           holders: holders[mint] ?? null,
           curve,

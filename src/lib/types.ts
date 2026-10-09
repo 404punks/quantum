@@ -12,6 +12,10 @@ export type LaunchItem = {
   dev_buy_sol: number;
   /** Quantum launches: the pqc-vault the dev buy was delivered into. */
   dev_vault?: string | null;
+  /** Coins paired with a token other than SOL (USDC, tokenized stocks, ...). */
+  quote_mint?: string | null;
+  quote_symbol?: string | null;
+  quote_image?: string | null;
   created_at: string;
   launched_at: string | null;
   twitter: string | null;
@@ -21,7 +25,7 @@ export type LaunchItem = {
   anchored: boolean;
 };
 
-export type CurveState = { progress: number; complete: boolean; marketCapSol: number };
+export type CurveState = { progress: number; complete: boolean; marketCapSol: number | null; quoteMint?: string | null; marketCapQuoteRaw?: number | null };
 
 export type MarketItem = {
   price: number | null;

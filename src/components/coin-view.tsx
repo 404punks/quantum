@@ -30,6 +30,9 @@ type Payload = {
     attestation: unknown;
     dev_buy_sol: number;
     dev_vault: string | null;
+    quote_mint: string | null;
+    quote_symbol: string | null;
+    quote_image: string | null;
     launched_at: string | null;
     tx_signature: string | null;
   };
@@ -134,7 +137,7 @@ export function CoinView({ mint, quantumRoute = false }: { mint: string; quantum
   const schemeTag = schemeInfo.id === "wots" ? `PQ-attested · leaf ${launch.leaf_index}` : `PQ-attested · ${schemeInfo.name}`;
   const change = overview?.priceChange24hPercent ?? null;
   const up = (change ?? 0) >= 0;
-  const marketCap = overview?.marketCap ?? (curve && data.solPrice ? curve.marketCapSol * data.solPrice : null);
+  const marketCap = overview?.marketCap ?? (curve?.marketCapSol != null && data.solPrice ? curve.marketCapSol * data.solPrice : null);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -147,6 +150,13 @@ export function CoinView({ mint, quantumRoute = false }: { mint: string; quantum
             <h1 className="flex flex-wrap items-center gap-2 text-[22px] font-semibold">
               {launch.name}
               <span className="font-mono text-[14px] font-normal text-muted">${launch.symbol}</span>
+              {launch.quote_symbol && (
+                <span className="flex items-center gap-1 font-mono text-[14px] font-normal text-dim" title={`Trades against ${launch.quote_symbol} on pump.fun`}>
+                  /
+                  {launch.quote_image && <img src={launch.quote_image} alt="" className="h-4 w-4 rounded-full" />}
+                  <span className="text-muted">{launch.quote_symbol}</span>
+                </span>
+              )}
             </h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <Pill tone="up">{schemeTag}</Pill>
@@ -212,7 +222,7 @@ export function CoinView({ mint, quantumRoute = false }: { mint: string; quantum
               {loadedRange !== range ? (
                 <Skeleton className="h-full w-full" />
               ) : (
-                <PriceChart candles={candles} range={range} lastPrice={overview?.price ?? null} />
+                <PriceChart candles={candles} range={range} lastPrice={overview?.price ?? null} pairSymbol={launch.quote_symbol} />
               )}
             </div>
           </Panel>
@@ -330,7 +340,7 @@ function tipTime(t: number) {
  * Close-price line on a real time axis. GeckoTerminal only returns intervals
  * that traded, so the line is carried flat to "now" after the last trade.
  */
-function PriceChart({ candles, range, lastPrice }: { candles: Candle[]; range: Range; lastPrice: number | null }) {
+function PriceChart({ candles, range, lastPrice, pairSymbol }: { candles: Candle[]; range: Range; lastPrice: number | null; pairSymbol?: string | null }) {
   const [hover, setHover] = useState<number | null>(null);
   const W = 1000;
   const H = 300;
@@ -366,7 +376,9 @@ function PriceChart({ candles, range, lastPrice }: { candles: Candle[]; range: R
       <div className="relative flex h-full flex-col items-center justify-center overflow-hidden border border-line bg-bg">
         <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-line-strong" />
         <div className="relative bg-bg px-3 text-center font-mono text-[12px] text-muted">
-          no trades in the last {range === "1H" ? "hour" : range === "1D" ? "day" : range === "1W" ? "week" : "month"}
+          {pairSymbol
+            ? "chart data not available"
+            : `no trades in the last ${range === "1H" ? "hour" : range === "1D" ? "day" : range === "1W" ? "week" : "month"}`}
           {lastPrice != null && <div className="mt-1 text-[11px] text-dim">last price {price(lastPrice)}</div>}
         </div>
       </div>
