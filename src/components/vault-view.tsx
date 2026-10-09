@@ -456,7 +456,7 @@ function Progress({ progress }: { progress: { step: SpendStep; detail?: string }
   return (
     <div className="border border-line-strong bg-[#0b0a0a] font-mono">
       <div className="flex items-center justify-between border-b border-line-strong bg-surface px-4 py-2 text-[11px] text-dim">
-        <span>pqc@bunker: ~/vault/spend</span>
+        <span>quantum@node: ~/vault/spend</span>
         <span>{progress.step === "done" ? "complete" : "running"}</span>
       </div>
       <ul className="space-y-1 px-4 py-3 text-[12px]">
@@ -775,7 +775,7 @@ function History({
   return (
     <div className="border border-line-strong bg-[#0b0a0a] font-mono">
       <div className="flex items-center justify-between border-b border-line-strong bg-surface px-4 py-2 text-[11px] text-dim">
-        <span>pqc@bunker: ~/vault/log</span>
+        <span>quantum@node: ~/vault/log</span>
         <span>withdrawals</span>
       </div>
       {slots === null ? (
@@ -784,7 +784,7 @@ function History({
         </div>
       ) : spent.length === 0 ? (
         <div className="px-4 py-6 text-[12px] text-dim">
-          <span className="text-up">pqc@bunker</span>:~$ tail log
+          <span className="text-up">quantum@node</span>:~$ tail log
           <div className="mt-1">no withdrawals yet</div>
         </div>
       ) : (

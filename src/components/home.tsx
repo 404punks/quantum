@@ -16,57 +16,59 @@ type Status = "all" | "graduated";
 type Kind = "all" | "standard" | "quantum";
 
 const KINDS: { value: Kind; label: string; hint: string }[] = [
-  { value: "all", label: "All coins", hint: "Every pqc.market launch" },
+  { value: "all", label: "All coins", hint: "Every quantum launch" },
   { value: "standard", label: "Standard", hint: "Post-quantum provenance, dev funds in a wallet" },
   { value: "quantum", label: "Quantum", hint: "Hash-based, dev funds locked in a quantum vault" },
 ];
 
 export function Home() {
   return (
-    <div className="mx-auto max-w-6xl px-4">
-      <section className="grid items-center gap-10 pb-16 pt-6 lg:grid-cols-[1fr_minmax(0,500px)] lg:pt-10">
+    <div className="mx-auto max-w-7xl px-4 sm:px-8">
+      <section className="grid items-center gap-10 pb-20 pt-10 lg:grid-cols-[1fr_minmax(0,540px)] lg:pt-16">
         <div>
           <Link
             href="/docs"
-            className="group inline-flex cursor-pointer items-center gap-2 rounded-md border border-line bg-surface px-3.5 py-1.5 text-[12px] text-muted transition-colors hover:border-line-strong hover:text-fg"
+            className="group inline-flex cursor-pointer items-center gap-2 border border-up/30 bg-up/5 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-up transition-all hover:border-up hover:bg-up/10"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-up" />
-            Bunker mode: why hash-based keys matter now
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up shadow-[0_0_10px_var(--up)]" />
+            Network online · quantum resistant
             <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
           </Link>
 
-          <h1 className="mt-6 font-serif text-[36px] font-bold leading-[1.08] tracking-tight sm:text-[50px]">
-            Launch coins that
-            <br />
-            survive <span className="italic text-up">Q-day</span>.
+          <h1 className="mt-7 font-serif text-[44px] font-bold uppercase leading-[0.95] tracking-[-0.04em] sm:text-[68px]">
+            Quantum
+            <br /><span className="neon-text">launch terminal</span>
           </h1>
-          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-muted">
-            Every coin is signed by a one-time, hash-based key derived from your wallet. Live on pump.fun, with provenance
-            that outlives ECDSA.
+          <p className="mt-6 max-w-xl text-[13px] leading-relaxed text-muted sm:text-[14px]">
+            Deploy tokens with hash-based signatures and vault-locked dev funds.
+            Built for the chain today. Secured for the quantum era.
           </p>
 
-          <div className="mt-8 flex flex-wrap gap-2">
-            <ButtonLink href="/launch" variant="primary">Launch a coin</ButtonLink>
-            <ButtonLink href="/docs">How it works</ButtonLink>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <ButtonLink href="/launch" variant="primary">Initialize launch →</ButtonLink>
+            <ButtonLink href="/docs">Read protocol</ButtonLink>
           </div>
 
-          <dl className="mt-10 flex gap-8 font-mono text-[12px]">
+          <dl className="mt-11 grid max-w-lg grid-cols-3 border-y border-line py-4 font-mono text-[10px] uppercase tracking-wider sm:text-[11px]">
             <div>
               <dt className="text-dim">signature</dt>
-              <dd className="mt-1 text-fg">2,404 B</dd>
+              <dd className="mt-1.5 text-up">WOTS+</dd>
             </div>
             <div>
-              <dt className="text-dim">keys / identity</dt>
-              <dd className="mt-1 text-fg">256</dd>
+              <dt className="text-dim">identity keys</dt>
+              <dd className="mt-1.5 text-fg">256 leaves</dd>
             </div>
             <div>
-              <dt className="text-dim">assumption</dt>
-              <dd className="mt-1 text-fg">SHA-256</dd>
+              <dt className="text-dim">security core</dt>
+              <dd className="mt-1.5 text-fg">SHA-256</dd>
             </div>
           </dl>
         </div>
 
-        <ProofAnimation />
+        <div className="relative">
+          <div aria-hidden className="absolute -inset-6 bg-up/5 blur-3xl" />
+          <ProofAnimation className="pixel-panel neon-shadow relative" />
+        </div>
       </section>
 
       <CoinsSection />

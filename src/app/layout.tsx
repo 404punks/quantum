@@ -1,25 +1,27 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Geist, Geist_Mono, Libre_Baskerville } from "next/font/google";
+import { Chakra_Petch, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-const serif = Libre_Baskerville({ variable: "--font-serif", subsets: ["latin"], weight: ["400", "700"] });
+const sans = Space_Grotesk({ variable: "--font-quantum-sans", subsets: ["latin"] });
+const mono = JetBrains_Mono({ variable: "--font-quantum-mono", subsets: ["latin"] });
+const display = Chakra_Petch({ variable: "--font-quantum-display", subsets: ["latin"], weight: ["500", "600", "700"] });
 
 export const metadata: Metadata = {
-  title: "pqc.market",
+  title: {
+    default: "quantum",
+    template: "%s · quantum",
+  },
   description:
-    "Launch coins on pump.fun with hash-based, post-quantum attestations. WOTS one-time keys, Merkle identities, on-chain anchors.",
-  metadataBase: new URL("https://pqc.market"),
+    "The post-quantum launch terminal. Launch coins with hash-based attestations, Merkle identities, and quantum vaults.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${serif.variable} h-full antialiased`}>
+    <html lang="en" className={`${sans.variable} ${mono.variable} ${display.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <Providers>
           {/* Cache Components: request-time reads (pathname, params) must sit under Suspense. */}

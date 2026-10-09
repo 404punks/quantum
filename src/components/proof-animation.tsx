@@ -85,13 +85,13 @@ export function ProofAnimation({ className }: { className?: string }) {
   return (
     <div className={cn("border border-line-strong bg-[#0b0a0a] font-mono text-[11.5px] leading-relaxed", className)}>
       <div className="flex items-center justify-between border-b border-line-strong bg-surface px-3 py-1.5 text-[11px] text-dim">
-        <span>pqc@bunker: ~/verify</span>
+        <span>quantum@node: ~/verify</span>
         <span>wots-sha256 · w=16</span>
       </div>
 
       <div className="p-4">
         <div className="text-muted">
-          <span className="text-up">pqc@bunker</span>:<span className="text-fg">~</span>$ wots verify --live
+          <span className="text-up">quantum@node</span>:<span className="text-fg">~</span>$ wots verify --live
         </div>
 
         <div className="mt-3 space-y-0.5">

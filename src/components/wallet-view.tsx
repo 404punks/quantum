@@ -751,12 +751,12 @@ function TransferLog({ transfers, identity }: { transfers: Transfer[]; identity:
   return (
     <div className="border border-line-strong bg-[#0b0a0a] font-mono">
       <div className="flex items-center justify-between border-b border-line-strong bg-surface px-4 py-2 text-[11px] text-dim">
-        <span>pqc@bunker: ~/wallet/log</span>
+        <span>quantum@node: ~/wallet/log</span>
         <span>dual-signed transfers</span>
       </div>
       {transfers.length === 0 ? (
         <div className="px-4 py-6 text-[12px] text-dim">
-          <span className="text-up">pqc@bunker</span>:~$ tail log
+          <span className="text-up">quantum@node</span>:~$ tail log
           <div className="mt-1">no transfers yet</div>
         </div>
       ) : (

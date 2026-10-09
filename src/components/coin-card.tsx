@@ -122,8 +122,8 @@ export function CoinCard({
   );
 
   const className = cn(
-    "fade-up group relative flex flex-col border bg-surface p-4 transition-colors duration-700",
-    fresh ? "border-up/70 shadow-[0_0_0_1px_var(--up),0_0_28px_-8px_var(--up)]" : quantum ? "border-line-strong" : "border-line",
+    "pixel-panel fade-up group relative flex flex-col border bg-surface/80 p-4 backdrop-blur-md transition-all duration-300 hover:-translate-y-1",
+    fresh ? "border-up/70 shadow-[0_0_0_1px_var(--up),0_0_28px_-8px_var(--up)]" : quantum ? "border-up/35 shadow-[0_0_24px_-18px_var(--up)]" : "border-line",
   );
   const style = quantum ? { backgroundImage: DOTS, backgroundSize: "12px 12px" } : undefined;
   if (preview) return <article className={className} style={style}>{body}</article>;
@@ -169,7 +169,7 @@ function schemeLabel(scheme: string | undefined, leaf: number | null | undefined
 
 export function CoinCardSkeleton() {
   return (
-    <div className="flex flex-col border border-line bg-surface p-4">
+    <div className="pixel-panel flex flex-col border border-line bg-surface/80 p-4">
       <div className="flex items-start gap-3">
         <Skeleton className="h-14 w-14" />
         <div className="flex-1 space-y-2 pt-1">
