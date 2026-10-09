@@ -78,8 +78,9 @@ function CoinsSection() {
 
   // Graduation is filtered on the server across every live launch, not just the loaded page.
   const listUrl = useCallback(
-    (offset: number) => `/api/launches?offset=${offset}${status === "graduated" ? "&status=graduated" : ""}`,
-    [status],
+    (offset: number) =>
+      `/api/launches?offset=${offset}${status === "graduated" ? "&status=graduated" : ""}${sort !== "new" ? `&sort=${sort}` : ""}`,
+    [status, sort],
   );
 
   useEffect(() => {
@@ -117,6 +118,8 @@ function CoinsSection() {
 
   const statusRef = useRef(status);
   statusRef.current = status;
+  const sortRef = useRef(sort);
+  sortRef.current = sort;
 
   // Supabase Realtime: RLS only streams rows once status = live, i.e. when submit confirms.
   useEffect(() => {
@@ -146,7 +149,7 @@ function CoinsSection() {
           hardened: false,
           anchored: false,
         };
-        if (statusRef.current !== "all") return;
+        if (statusRef.current !== "all" || sortRef.current !== "new") return;
         setLaunches((prev) => (prev && !prev.some((l) => l.mint === item.mint) ? [item, ...prev] : prev));
         setFresh((prev) => new Set(prev).add(item.mint));
         timers.push(
@@ -191,16 +194,10 @@ function CoinsSection() {
   const visible = useMemo(() => {
     if (!launches) return null;
     const m = market ?? {};
-    const list = [...launches];
-    const key: Record<Exclude<Sort, "new">, (x: MarketItem | undefined) => number> = {
-      mcap: (x) => x?.marketCap ?? -1,
-      volume: (x) => x?.volume24h ?? -1,
-      holders: (x) => x?.holders ?? -1,
-    };
-    // "new" keeps the server's launched_at desc order.
-    if (sort !== "new") list.sort((a, b) => key[sort](m[b.mint]) - key[sort](m[a.mint]));
-    return list;
-  }, [launches, market, sort]);
+    // Ranking happens on the server across every coin, so the page order is already correct.
+    void m;
+    return [...launches];
+  }, [launches, market]);
 
   return (
     <section className="min-h-[110vh] pb-24">
