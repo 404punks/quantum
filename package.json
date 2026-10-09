@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "keeper": "node --env-file=.env keeper/keeper.mjs"
   },
   "dependencies": {
     "@noble/curves": "^2.4.0",

@@ -12,6 +12,9 @@ import { WalletsFingerprintScene, WalletsFingerprintTweet, WalletsLaunchScene, W
 import { VaultAuthScene, VaultBreakdownScene } from "./vault-graphics";
 import { PqcTokenTweet } from "./token-graphics";
 import { PairsScene, PairsTweet } from "./pairs-graphics";
+import { RevenueScene, RevenueTweet } from "./revenue-graphics";
+import { NumbersScene, NumbersTweet } from "./stats-graphics";
+import { CoinPageScene, CoinPageTweet } from "./coinpage-graphics";
 import { SceneAvatar, SceneBunkerMode, SceneHeader, SceneIntro, ScenePortrait, SceneProof, SceneSquare } from "./scene-graphics";
 
 /**
@@ -531,6 +534,12 @@ export function ProfilePicture() {
 export type Graphic = { id: string; title: string; note: string; w: number; h: number; group: string; Component: () => ReactNode };
 
 export const GRAPHICS: Graphic[] = [
+  { id: "token-pages-bunker", title: "Token pages, rebuilt · bunker", note: "Live quantum coin page · artwork edition", w: 1600, h: 900, group: "Token pages", Component: CoinPageScene },
+  { id: "token-pages", title: "Token pages, rebuilt", note: "Live quantum coin page", w: 1600, h: 900, group: "Token pages", Component: CoinPageTweet },
+  { id: "numbers-live-bunker", title: "24-hour recap · bunker", note: "Live stats · artwork edition", w: 1600, h: 900, group: "Platform stats", Component: NumbersScene },
+  { id: "numbers-live", title: "24-hour recap", note: "Live stats", w: 1600, h: 900, group: "Platform stats", Component: NumbersTweet },
+  { id: "revenue-bunker", title: "Buybacks are live · revenue split", note: "60 / 20 / 20 · artwork edition", w: 1600, h: 900, group: "Revenue & buybacks", Component: RevenueScene },
+  { id: "revenue", title: "Buybacks are live · revenue split", note: "60 / 20 / 20", w: 1600, h: 900, group: "Revenue & buybacks", Component: RevenueTweet },
   { id: "pairs-bunker", title: "Quantum coins, paired with anything · bunker", note: "Quantum pairs · artwork edition", w: 1600, h: 900, group: "Custom pairs", Component: PairsScene },
   { id: "pairs", title: "Quantum coins, paired with anything", note: "Quantum pairs launch", w: 1600, h: 900, group: "Custom pairs", Component: PairsTweet },
   { id: "pqc-token", title: "$PQC coin page", note: "Platform token · live chart snippet", w: 1600, h: 900, group: "Platform token", Component: PqcTokenTweet },

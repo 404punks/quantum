@@ -4,6 +4,7 @@ import { curveMarketCapsUsd } from "@/lib/server/curve-usd";
 import { dexStats, solPrice } from "@/lib/server/dexscreener";
 import { poolCandles, type Timeframe } from "@/lib/server/geckoterminal";
 import { holderCount } from "@/lib/server/holders";
+import { vaultHoldings } from "@/lib/server/vault-holdings";
 import { curveStates } from "@/lib/server/solana";
 import { db } from "@/lib/server/supabase";
 import { bad, isPubkey } from "@/lib/server/validate";
@@ -106,7 +107,11 @@ export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]
       : null;
 
   const { pqc_identities: identity, ...row } = launch;
+  // Quantum launches: what the dev vault holds right now.
+  const vault = typeof row.dev_vault === "string" ? await vaultHoldings(mint, row.dev_vault).catch(() => null) : null;
+
   return Response.json({
+    vault,
     launch: row,
     identity,
     overview,

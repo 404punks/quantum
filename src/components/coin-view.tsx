@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Anchor, ArrowUpRight, Check, Fingerprint, Globe, Lock, MessageCircle, Send, X } from "lucide-react";
+import { Anchor, ArrowUpRight, Check, Copy, Fingerprint, Globe, Loader2, Lock, MessageCircle, Send, ShieldCheck, X } from "lucide-react";
 import { SCHEMES, isSchemeId } from "@/lib/pq/scheme-info";
 import { verifyLaunch, type LaunchVerification } from "@/lib/pq/verify-launch";
 import type { CurveState } from "@/lib/types";
@@ -58,6 +58,7 @@ type Payload = {
     sells24h: number | null;
   } | null;
   candles: Candle[];
+  vault?: { address: string; tokens: number; pctSupply: number; spent: boolean } | null;
   candlesOk?: boolean;
   curve: CurveState | null;
   solPrice: number | null;
@@ -139,65 +140,94 @@ export function CoinView({ mint, quantumRoute = false }: { mint: string; quantum
   const up = (change ?? 0) >= 0;
   const marketCap = overview?.marketCap ?? (curve?.marketCapSol != null && data.solPrice ? curve.marketCapSol * data.solPrice : null);
 
+  const quantum = Boolean(launch.dev_vault);
+  const vault = data.vault ?? null;
+  const verifying = !verification;
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <Link href="/" className="cursor-pointer text-[12.5px] text-muted hover:text-fg">← All coins</Link>
 
-      <header className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <img src={thumb(launch.image_url, 128)} alt="" className="h-16 w-16 rounded-xl border border-line object-cover" />
-          <div>
-            <h1 className="flex flex-wrap items-center gap-2 text-[22px] font-semibold">
-              {launch.name}
-              <span className="font-mono text-[14px] font-normal text-muted">${launch.symbol}</span>
-              {launch.quote_symbol && (
-                <span className="flex items-center gap-1 font-mono text-[14px] font-normal text-dim" title={`Trades against ${launch.quote_symbol} on pump.fun`}>
-                  /
-                  {launch.quote_image && <img src={launch.quote_image} alt="" className="h-4 w-4 rounded-full" />}
-                  <span className="text-muted">{launch.quote_symbol}</span>
+      {/* Hero */}
+      <section
+        className={cn("relative mt-4 rounded-2xl border bg-surface p-5 sm:p-6", quantum ? "border-line-strong" : "border-line")}
+        style={quantum ? { backgroundImage: "radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px)", backgroundSize: "12px 12px" } : undefined}
+      >
+        {quantum && <QuantumCorners />}
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <img src={thumb(launch.image_url, 160)} alt="" className="h-20 w-20 shrink-0 rounded-2xl border border-line object-cover" />
+            <div className="min-w-0">
+              <h1 className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-[26px] font-semibold leading-tight">
+                <span className="truncate">{launch.name}</span>
+                <span className="font-mono text-[15px] font-normal text-muted">${launch.symbol}</span>
+                {launch.quote_symbol && (
+                  <span className="flex items-center gap-1 font-mono text-[15px] font-normal text-dim" title={`Trades against ${launch.quote_symbol} on pump.fun`}>
+                    /
+                    {launch.quote_image && <img src={launch.quote_image} alt="" className="h-4 w-4 rounded-full" />}
+                    <span className="text-muted">{launch.quote_symbol}</span>
+                  </span>
+                )}
+              </h1>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {quantum && (
+                  <span className="inline-flex items-center gap-1.5 bg-fg px-2 py-0.5 font-mono text-[10.5px] font-semibold tracking-[0.12em] text-bg">
+                    <Lock size={10} /> QUANTUM
+                  </span>
+                )}
+                <Pill tone="up">{schemeTag}</Pill>
+                {identity.passphrase_hardened && <Pill>hardened</Pill>}
+                {identity.anchor_tx && <Pill>anchored root</Pill>}
+                {curve?.complete && <Pill>graduated</Pill>}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-start gap-3 md:items-end">
+            <div className="flex items-baseline gap-2.5">
+              <span className="font-mono text-[28px] leading-none text-fg">{overview?.price != null ? price(overview.price) : marketCap != null ? usd(marketCap) : "New"}</span>
+              {change != null && (
+                <span className={cn("rounded-md px-2 py-0.5 font-mono text-[12px]", up ? "bg-up/10 text-up" : "bg-down/10 text-down")}>
+                  {pct(change)} 24h
                 </span>
               )}
-            </h1>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <Pill tone="up">{schemeTag}</Pill>
-              {launch.dev_vault && (
-                <Pill tone="up">
-                  <Lock size={10} /> dev buy in quantum vault
-                </Pill>
-              )}
-              {identity.anchor_tx && <Pill>anchored root</Pill>}
-              {identity.passphrase_hardened && <Pill>hardened</Pill>}
-              <CopyText value={launch.mint} display={short(launch.mint, 6, 6)} className="ml-1 text-[11.5px] text-dim" />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={`https://pump.fun/coin/${launch.mint}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-fg px-4 py-2 text-[13px] font-medium text-bg hover:bg-white"
+              >
+                Trade on pump.fun <ArrowUpRight size={13} />
+              </a>
+              <CopyCa mint={launch.mint} />
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <a
-            href={`https://pump.fun/coin/${launch.mint}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-fg px-4 py-2 text-[13px] font-medium text-bg hover:bg-white"
-          >
-            {/* TODO: in-app buy/sell via pump-sdk buyInstructions/sellInstructions */}
-            Trade on pump.fun <ArrowUpRight size={13} />
-          </a>
-          <Button onClick={runVerify}>Verify</Button>
-        </div>
-      </header>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-6">
+        <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-5">
+          <StripCell k="Market cap" v={marketCap != null ? usd(marketCap) : "—"} />
+          <StripCell k="24h volume" v={overview?.v24hUSD ? usd(overview.v24hUSD) : "—"} />
+          <StripCell k="Holders" v={overview?.holder != null ? num(overview.holder) : "—"} />
+          <StripCell k="Liquidity" v={overview?.liquidity ? usd(overview.liquidity) : "—"} />
+          <div className="col-span-2 bg-bg px-4 py-3 sm:col-span-1">
+            <dt className="text-[11px] text-dim">{curve?.complete ? "Graduated" : "Bonding curve"}</dt>
+            <dd className="mt-1 flex items-center gap-2.5">
+              <span className="font-mono text-[15px] text-fg">{curve ? `${(curve.progress * 100).toFixed(1)}%` : "—"}</span>
+              <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3">
+                <span className={cn("block h-full rounded-full", curve?.complete ? "bg-up" : "bg-fg")} style={{ width: `${Math.max((curve?.progress ?? 0) * 100, 1)}%` }} />
+              </span>
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_330px]">
+        <div className="min-w-0 space-y-6">
           <Panel className="p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="font-mono text-[26px] leading-none text-fg">{overview?.price != null ? price(overview.price) : marketCap != null ? usd(marketCap) : "New coin"}</div>
-                {change != null && (
-                  <div className={cn("mt-2 inline-flex items-center gap-1.5 font-mono text-[12px]", up ? "text-up" : "text-down")}>
-                    {pct(change)}
-                    <span className="text-dim">24h</span>
-                  </div>
-                )}
-              </div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-[11px] uppercase tracking-wider text-dim">Price</span>
               <div role="tablist" aria-label="Chart range" className="flex border border-line bg-bg p-0.5 font-mono text-[11.5px]">
                 {RANGES.map((r) => (
                   <button
@@ -208,17 +238,14 @@ export function CoinView({ mint, quantumRoute = false }: { mint: string; quantum
                       setAutoRange(false);
                       setRange(r);
                     }}
-                    className={cn(
-                      "cursor-pointer px-2.5 py-1 transition-colors",
-                      range === r ? "bg-fg text-bg" : "text-muted hover:text-fg",
-                    )}
+                    className={cn("cursor-pointer px-2.5 py-1 transition-colors", range === r ? "bg-fg text-bg" : "text-muted hover:text-fg")}
                   >
                     {r}
                   </button>
                 ))}
               </div>
             </div>
-            <div className="mt-5 h-[300px]">
+            <div className="mt-5 h-[320px]">
               {loadedRange !== range ? (
                 <Skeleton className="h-full w-full" />
               ) : (
@@ -228,78 +255,84 @@ export function CoinView({ mint, quantumRoute = false }: { mint: string; quantum
           </Panel>
 
           {verification && <LaunchVerificationView v={verification} title="Attestation verified in your browser" />}
-
         </div>
 
         <aside className="space-y-4">
-          <Panel className="p-5">
-            <MarketStats
-              stats={[
-                ["Market cap", marketCap != null ? usd(marketCap) : null],
-                ["24h volume", overview?.v24hUSD ? usd(overview.v24hUSD) : null],
-                ["Holders", overview?.holder != null ? num(overview.holder) : null],
-                ["Liquidity", overview?.liquidity ? usd(overview.liquidity) : null],
-              ]}
-              buys={overview?.buys24h ?? null}
-              sells={overview?.sells24h ?? null}
-            />
-          </Panel>
-
-          <Panel className="p-5">
-            <div className="mb-2 flex items-center justify-between text-[12px]">
-              <span className="text-muted">{curve?.complete ? "Graduated to PumpSwap" : "Bonding curve"}</span>
-              {curve && <span className="font-mono">{(curve.progress * 100).toFixed(1)}%</span>}
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-surface-3">
-              <div className={cn("h-full rounded-full", curve?.complete ? "bg-up" : "bg-fg")} style={{ width: `${Math.max((curve?.progress ?? 0) * 100, 1)}%` }} />
-            </div>
-            <p className="mt-3 text-[11.5px] text-dim">
-              {curve?.complete
-                ? "Liquidity migrated to the pump AMM."
-                : "When the curve fills, liquidity migrates to PumpSwap automatically."}
-            </p>
-          </Panel>
-
-          <Panel className="p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-dim">Provenance</span>
-              {verification && (
-                <Pill tone={verification.valid ? "up" : "down"}>
-                  {verification.valid ? <Check size={10} /> : <X size={10} />} {verification.valid ? "valid" : "invalid"}
-                </Pill>
+          {quantum && (
+            <Panel className="relative overflow-hidden border-line-strong p-5">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-dim">
+                  <Lock size={11} className="text-fg" /> Quantum vault
+                </span>
+                <span className={cn("font-mono text-[11px]", vault?.spent ? "text-warn" : "text-up")}>{vault ? (vault.spent ? "withdrawn" : "locked") : ""}</span>
+              </div>
+              {vault ? (
+                <>
+                  <div className="mt-3 font-mono text-[26px] leading-none text-fg">
+                    {vault.tokens.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 2 })}
+                    <span className="ml-1.5 text-[13px] text-muted">${launch.symbol}</span>
+                  </div>
+                  <div className="mt-1.5 text-[12px] text-dim">{vault.pctSupply.toFixed(2)}% of supply held by the dev's vault</div>
+                  <p className="mt-4 text-[12px] leading-relaxed text-muted">
+                    {vault.spent
+                      ? "The dev has withdrawn from this vault; what was left moved to their next vault."
+                      : "The dev buy went straight into a vault that only moves with a hash-based signature, checked on-chain."}
+                  </p>
+                </>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  <Skeleton className="h-7 w-32" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
               )}
+              <div className="mt-4 flex items-center justify-between border-t border-line pt-3 font-mono text-[11px]">
+                <CopyText value={launch.dev_vault!} display={short(launch.dev_vault!, 6, 6)} className="text-dim" />
+                <a href={`https://solscan.io/account/${launch.dev_vault}`} target="_blank" rel="noreferrer" className="flex cursor-pointer items-center gap-1 text-muted hover:text-fg">
+                  Solscan <ArrowUpRight size={11} />
+                </a>
+              </div>
+            </Panel>
+          )}
+
+          <Panel className="p-5">
+            <div className="text-[11px] uppercase tracking-wider text-dim">Provenance</div>
+            <div className="mt-3 flex items-center gap-3">
+              <span
+                className={cn(
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border",
+                  verifying ? "border-line text-dim" : verification?.valid ? "border-up/40 bg-up/10 text-up" : "border-down/40 bg-down/10 text-down",
+                )}
+              >
+                {verifying ? <Loader2 size={15} className="animate-spin" /> : verification?.valid ? <ShieldCheck size={16} /> : <X size={16} />}
+              </span>
+              <div className="min-w-0">
+                <div className="text-[14px] font-medium text-fg">{verifying ? "Verifying…" : verification?.valid ? "Verified" : "Doesn't verify"}</div>
+                <div className="truncate text-[11.5px] text-dim">
+                  {schemeInfo.id === "wots" ? `signed with WOTS leaf #${launch.leaf_index}` : `signed with ${schemeInfo.name}`} · checked in your browser
+                </div>
+              </div>
             </div>
-            <dl className="space-y-2 font-mono text-[11px]">
+            <dl className="mt-4 space-y-2 border-t border-line pt-3 font-mono text-[11px]">
               <KV k="signer" v={<CopyText value={identity.pq_address} display={short(identity.pq_address, 8, 6)} />} />
               <KV k="creator" v={<CopyText value={launch.creator} display={short(launch.creator, 6, 6)} />} />
-              <KV k="root" v={<CopyText value={identity.root} display={short(identity.root, 8, 6)} />} />
-              <KV k="scheme" v={schemeInfo.name} />
-              {verification?.kind === "scheme" ? (
-                <KV k="certified by" v={`leaf #${verification.leaf}`} />
-              ) : (
-                <KV k="leaf" v={`#${launch.leaf_index} / ${1 << identity.height}`} />
-              )}
-              <KV k="sig size" v={`${schemeInfo.sigBytes.toLocaleString()} B`} />
+              <KV k="scheme" v={`${schemeInfo.name} · ${schemeInfo.sigBytes.toLocaleString()} B`} />
               <KV k="dev buy" v={`${launch.dev_buy_sol} SOL`} />
-              {launch.dev_vault && (
-                <KV
-                  k="dev vault"
-                  v={
-                    <a href={`https://solscan.io/account/${launch.dev_vault}`} target="_blank" rel="noreferrer" className="cursor-pointer text-up hover:underline">
-                      {short(launch.dev_vault, 6, 6)}
-                    </a>
-                  }
-                />
-              )}
               <KV k="launched" v={ago(launch.launched_at)} />
             </dl>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <Button size="sm" onClick={runVerify}>Verify here</Button>
+              <Button size="sm" onClick={runVerify}>Verify again</Button>
               {launch.metadata_uri ? (
                 <a href={launch.metadata_uri} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center justify-center gap-1 rounded-xl border border-line px-2.5 py-1.5 text-[12px] hover:border-line-strong hover:bg-surface-2">
                   Metadata <ArrowUpRight size={11} />
                 </a>
               ) : <span />}
+            </div>
+          </Panel>
+
+          <Panel className="p-5">
+            <div className="text-[11px] uppercase tracking-wider text-dim">24h activity</div>
+            <div className="mt-3">
+              <MarketStats stats={[]} buys={overview?.buys24h ?? null} sells={overview?.sells24h ?? null} />
             </div>
           </Panel>
 
@@ -317,6 +350,47 @@ export function CoinView({ mint, quantumRoute = false }: { mint: string; quantum
         </aside>
       </div>
     </div>
+  );
+}
+
+function StripCell({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="bg-bg px-4 py-3">
+      <dt className="text-[11px] text-dim">{k}</dt>
+      <dd className="mt-1 truncate font-mono text-[15px] text-fg">{v}</dd>
+    </div>
+  );
+}
+
+function CopyCa({ mint }: { mint: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard?.writeText(mint);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      }}
+      className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-line px-3.5 py-2 font-mono text-[12.5px] text-muted transition-colors hover:border-line-strong hover:text-fg"
+      title={mint}
+    >
+      {copied ? <Check size={13} className="text-up" /> : <Copy size={13} />}
+      {copied ? "Copied" : `CA ${short(mint, 4, 4)}`}
+    </button>
+  );
+}
+
+/** Viewfinder corners for quantum coins, matching their grid cards. */
+function QuantumCorners() {
+  const c = "pointer-events-none absolute h-4 w-4 border-fg";
+  return (
+    <>
+      <span aria-hidden className={cn(c, "-left-px -top-px rounded-tl-2xl border-l-2 border-t-2")} />
+      <span aria-hidden className={cn(c, "-right-px -top-px rounded-tr-2xl border-r-2 border-t-2")} />
+      <span aria-hidden className={cn(c, "-bottom-px -left-px rounded-bl-2xl border-b-2 border-l-2")} />
+      <span aria-hidden className={cn(c, "-bottom-px -right-px rounded-br-2xl border-b-2 border-r-2")} />
+    </>
   );
 }
 
@@ -457,6 +531,7 @@ function PriceChart({ candles, range, lastPrice, pairSymbol }: { candles: Candle
 function MarketStats({ stats, buys, sells }: { stats: [string, string | null][]; buys: number | null; sells: number | null }) {
   const shown = stats.filter((x): x is [string, string] => x[1] != null);
   const trades = buys != null && sells != null ? buys + sells : 0;
+  if (!stats.length && !trades) return <p className="text-[12px] text-dim">No trades in the last 24 hours.</p>;
   if (!shown.length && !trades) {
     return (
       <div className="space-y-3">
