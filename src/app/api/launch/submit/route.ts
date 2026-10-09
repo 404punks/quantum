@@ -1,5 +1,6 @@
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { PUMP_PROGRAM_ID } from "@pump-fun/pump-sdk";
+import { announceLaunch } from "@/lib/server/feed";
 import { confirmSignature, connection } from "@/lib/server/solana";
 import { db, type LaunchRow } from "@/lib/server/supabase";
 import { bad, isPubkey } from "@/lib/server/validate";
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
       .from("pqc_launches")
       .update({ status: "live", launched_at: new Date().toISOString() })
       .eq("mint", launch.mint);
+    await announceLaunch(launch.mint);
   }
   return Response.json({ signature, status: landed ? "live" : "pending" });
 }

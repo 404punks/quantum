@@ -131,14 +131,15 @@ function CoinsSection() {
   const kindRef = useRef(kind);
   kindRef.current = kind;
 
-  // Supabase Realtime: RLS only streams rows once status = live, i.e. when submit confirms.
+  // Realtime Broadcast: the server announces each launch once it is live. No
+  // database polling or per-tab RLS checks, unlike postgres_changes.
   useEffect(() => {
     const supabase = supabaseBrowser();
     const timers: ReturnType<typeof setTimeout>[] = [];
     const channel = supabase
       .channel("pqc-launches-feed")
-      .on("postgres_changes", { event: "*", schema: "public", table: "pqc_launches" }, (payload) => {
-        const row = payload.new as Partial<LaunchItem> & { status?: string };
+      .on("broadcast", { event: "launch" }, ({ payload }) => {
+        const row = payload as Partial<LaunchItem> & { status?: string };
         if (!row?.mint || row.status !== "live") return;
         const item: LaunchItem = {
           mint: row.mint,

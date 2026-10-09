@@ -1,3 +1,4 @@
+import { announceLaunch } from "@/lib/server/feed";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { launchDigest } from "@/lib/pq/messages";
 import { verify } from "@/lib/pq/xmss";
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
     });
     if (error) return bad(error.message, 500);
     await db.from("pqc_imports").insert({ mint });
+    await announceLaunch(mint);
 
     return Response.json({ mint, leaf });
   } catch (err) {

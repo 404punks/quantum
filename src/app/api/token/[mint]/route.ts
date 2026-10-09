@@ -1,4 +1,5 @@
 import { ohlcv } from "@/lib/server/birdeye";
+import { cached } from "@/lib/server/cache";
 import { dexStats, solPrice } from "@/lib/server/dexscreener";
 import { poolCandles, type Timeframe } from "@/lib/server/geckoterminal";
 import { holderCount } from "@/lib/server/holders";
@@ -31,18 +32,45 @@ async function chartCandles(mint: string, pool: string | null, range: Range) {
   return ohlcv(mint, range.birdeye.type, range.birdeye.seconds);
 }
 
+const LAUNCH_SELECT =
+  "*, pqc_identities(wallet, pq_address, root, pub_seed, height, passphrase_hardened, anchor_tx, anchored_at, created_at)";
+
+class Uncacheable extends Error {
+  constructor(readonly row: Record<string, unknown> | null) {
+    super("uncacheable");
+  }
+}
+
+/**
+ * The launch and its identity. A live launch never changes, so it is cached for
+ * 60s (an open coin page polls every 30s); a pending one is always read fresh.
+ */
+async function launchRow(mint: string): Promise<Record<string, unknown> | null> {
+  try {
+    return await cached(`launch:row:${mint}`, 60_000, async () => {
+      const { data, error } = await db
+        .from("pqc_launches")
+        .select(LAUNCH_SELECT)
+        .eq("mint", mint)
+        // Live, or broadcast but not yet confirmed (the launcher lands here straight after submit).
+        .or("status.eq.live,and(status.eq.pending,tx_signature.not.is.null)")
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data || data.status !== "live") throw new Uncacheable(data);
+      return data as Record<string, unknown>;
+    });
+  } catch (err) {
+    if (err instanceof Uncacheable) return err.row;
+    throw err;
+  }
+}
+
 export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]">) {
   const { mint } = await ctx.params;
   if (!isPubkey(mint)) return bad("Invalid mint");
   const range = RANGES[new URL(request.url).searchParams.get("range") ?? "1D"] ?? RANGES["1D"];
 
-  const { data: launch } = await db
-    .from("pqc_launches")
-    .select("*, pqc_identities(wallet, pq_address, root, pub_seed, height, passphrase_hardened, anchor_tx, anchored_at, created_at)")
-    .eq("mint", mint)
-    // Live, or broadcast but not yet confirmed (the launcher lands here straight after submit).
-    .or("status.eq.live,and(status.eq.pending,tx_signature.not.is.null)")
-    .maybeSingle();
+  const launch = await launchRow(mint);
   if (!launch) return bad("Not a pqc.market launch", 404);
 
   // Stats from DexScreener + Helius; candles from GeckoTerminal for the coin's deepest pool.

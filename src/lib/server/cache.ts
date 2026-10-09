@@ -99,3 +99,23 @@ export async function cached<T>(
   pending.set(key, task);
   return task;
 }
+
+/**
+ * Drops every cached value whose key starts with `prefix`, in this process and
+ * in Redis. Other instances keep at most their short L1 copy (L1_MAX_MS).
+ */
+export async function invalidate(prefix: string) {
+  for (const key of memory.keys()) if (key.startsWith(prefix)) memory.delete(key);
+  const r = redis();
+  if (!r || !(await ready(r))) return;
+  try {
+    let cursor = "0";
+    do {
+      const [next, keys] = await r.scan(cursor, "MATCH", `${PREFIX}${prefix}*`, "COUNT", 200);
+      cursor = next;
+      if (keys.length) await r.del(...keys);
+    } while (cursor !== "0");
+  } catch {
+    // Expiry still bounds staleness.
+  }
+}

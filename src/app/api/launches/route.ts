@@ -1,9 +1,10 @@
+import { cached } from "@/lib/server/cache";
 import { graduatedMints } from "@/lib/server/graduation";
 import { rankMints, type RankSort } from "@/lib/server/ranking";
 import { db } from "@/lib/server/supabase";
 
 const COLUMNS =
-  "mint, name, symbol, description, image_url, creator, pq_address, leaf_index, scheme, message_hash, dev_buy_sol, dev_vault, created_at, launched_at, twitter, telegram, website, pqc_identities(passphrase_hardened, anchor_tx)";
+  "mint, name, symbol, description, image_url, creator, pq_address, leaf_index, scheme, message_hash, dev_buy_sol, dev_vault, quote_mint, quote_symbol, quote_image, created_at, launched_at, twitter, telegram, website, pqc_identities(passphrase_hardened, anchor_tx)";
 
 const PAGE = 48;
 const SORTS = new Set<RankSort>(["mcap", "volume", "holders"]);
@@ -26,6 +27,18 @@ function shape(rows: Row[]) {
  */
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
+  params.sort();
+  // One database read per distinct query every 10s, however many visitors ask.
+  // New coins still appear instantly through the broadcast feed.
+  try {
+    return Response.json(await cached(`launches:list:${params.toString()}`, 10_000, () => list(params)));
+  } catch (err) {
+    return Response.json({ error: err instanceof Error ? err.message : "Failed to load coins" }, { status: 500 });
+  }
+}
+
+/** Throws on database errors so a failure is never cached. */
+async function list(params: URLSearchParams) {
   const q = (params.get("q") ?? "").trim().slice(0, 40);
   const creator = params.get("creator");
   const status = params.get("status");
@@ -45,7 +58,7 @@ export async function GET(request: Request) {
   if (kind === "quantum") idQuery = idQuery.not("dev_vault", "is", null);
   else if (kind === "standard") idQuery = idQuery.is("dev_vault", null);
   const { data: ids, error: idError } = await idQuery;
-  if (idError) return Response.json({ error: idError.message }, { status: 500 });
+  if (idError) throw new Error(idError.message);
   let mints = (ids ?? []).map((r) => r.mint as string);
 
   if (status === "graduated") {
@@ -55,14 +68,14 @@ export async function GET(request: Request) {
   if (sort) mints = await rankMints(mints, sort).catch(() => mints);
 
   const page = mints.slice(offset, offset + PAGE);
-  if (!page.length) return Response.json({ launches: [], hasMore: false });
+  if (!page.length) return { launches: [], hasMore: false };
 
   const { data, error } = await db.from("pqc_launches").select(COLUMNS).in("mint", page);
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) throw new Error(error.message);
   const byMint = new Map((data as Row[] | null ?? []).map((r) => [r.mint, r]));
 
-  return Response.json({
+  return {
     hasMore: offset + PAGE < mints.length,
     launches: shape(page.map((m) => byMint.get(m)).filter((r): r is Row => Boolean(r))),
-  });
+  };
 }
