@@ -119,7 +119,7 @@ export function BigToggle<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className={cn("relative grid border border-line-strong bg-bg p-1", className)}
+      className={cn("relative grid w-full min-w-0 overflow-hidden border border-line-strong bg-bg p-1", className)}
       style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
     >
       <span
@@ -138,7 +138,7 @@ export function BigToggle<T extends string>({
             disabled={disabled}
             onClick={() => onChange(o.value)}
             className={cn(
-              "group relative z-10 min-w-0 cursor-pointer px-4 py-3.5 text-left transition-colors disabled:cursor-default sm:px-5 sm:py-4",
+              "group relative z-10 min-w-0 cursor-pointer overflow-hidden px-4 py-3.5 text-left transition-colors disabled:cursor-default sm:px-5 sm:py-4",
               on ? "text-bg" : "text-muted hover:text-fg",
             )}
           >
@@ -153,7 +153,7 @@ export function BigToggle<T extends string>({
               </span>
               <span className="truncate font-serif text-[19px] font-bold leading-none sm:text-[21px]">{o.label}</span>
             </div>
-            <div className={cn("mt-1.5 truncate pl-[26px] font-mono text-[11px]", on ? "text-bg/70" : "text-dim")}>{o.sub}</div>
+            <div className={cn("mt-1.5 min-w-0 truncate pl-[26px] font-mono text-[11px]", on ? "text-bg/70" : "text-dim")}>{o.sub}</div>
           </button>
         );
       })}

@@ -1,4 +1,4 @@
-import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES, pinImage } from "@/lib/server/pinata";
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES, pinImage, UPLOAD_FAILED } from "@/lib/server/pinata";
 import { bad } from "@/lib/server/validate";
 
 export async function POST(request: Request) {
@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   if (file.size > MAX_IMAGE_BYTES) return bad("Image must be under 5 MB");
   try {
     return Response.json({ url: await pinImage(file) });
-  } catch (err) {
-    return bad(err instanceof Error ? err.message : "Upload failed", 502);
+  } catch {
+    return bad(UPLOAD_FAILED, 502);
   }
 }

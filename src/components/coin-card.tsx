@@ -33,15 +33,6 @@ export function CoinCard({
   const body = (
     <>
       {quantum && <QuantumFrame />}
-      {quantum && (
-        <span className="absolute -top-2 right-5 z-10 flex items-center gap-1.5 bg-fg px-1.5 font-mono text-[9.5px] font-semibold leading-4 tracking-[0.14em] text-bg">
-          <span className="q-blink inline-block h-2 w-1 bg-bg" />
-          QUANTUM
-        </span>
-      )}
-      {fresh && (
-        <span className="absolute -top-2.5 left-4 border border-up/60 bg-bg px-1.5 font-mono text-[10px] text-up">just launched</span>
-      )}
       <header className="flex items-start gap-3">
         <div className="h-14 w-14 shrink-0 overflow-hidden border border-line bg-surface-2">
           {launch.image_url ? (
@@ -126,11 +117,26 @@ export function CoinCard({
     fresh ? "border-up/70 shadow-[0_0_0_1px_var(--up),0_0_28px_-8px_var(--up)]" : quantum ? "border-up/35 shadow-[0_0_24px_-18px_var(--up)]" : "border-line",
   );
   const style = quantum ? { backgroundImage: DOTS, backgroundSize: "12px 12px" } : undefined;
-  if (preview) return <article className={className} style={style}>{body}</article>;
-  return (
+  const card = preview ? (
+    <article className={className} style={style}>{body}</article>
+  ) : (
     <Link href={coinPath(launch.mint, quantum)} style={style} className={cn(className, "cursor-pointer hover:border-line-strong hover:bg-surface-2")}>
       {body}
     </Link>
+  );
+  return (
+    <div className="relative min-w-0">
+      {quantum && (
+        <span className="absolute -top-2 right-4 z-10 flex items-center gap-1.5 bg-fg px-1.5 font-mono text-[9.5px] font-semibold leading-4 tracking-[0.14em] text-bg">
+          <span className="q-blink inline-block h-2 w-1 bg-bg" />
+          QUANTUM
+        </span>
+      )}
+      {fresh && (
+        <span className="absolute -top-2.5 left-4 z-10 border border-up/60 bg-bg px-1.5 font-mono text-[10px] text-up">just launched</span>
+      )}
+      {card}
+    </div>
   );
 }
 
