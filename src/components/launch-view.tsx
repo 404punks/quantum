@@ -54,7 +54,7 @@ type StepState = "idle" | "active" | "done" | "error";
 
 export function LaunchView() {
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
+    <div className="mx-auto w-full min-w-0 max-w-6xl px-4 py-10">
       <div className="mb-8">
         <h1 className="font-serif text-[28px] font-bold tracking-tight">Launch a Post-Quantum Coin</h1>
         <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-muted">
@@ -270,11 +270,11 @@ function LaunchForm() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-      <Panel className="p-6">
+    <div className="grid w-full min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
+      <Panel className="min-w-0 p-6">
         <ModeToggle quantum={quantum} onChange={chooseMode} disabled={running} />
 
-        <div className="mt-6 grid gap-5 border-t border-line pt-6 sm:grid-cols-[140px_1fr]">
+        <div className="mt-6 grid min-w-0 gap-5 border-t border-line pt-6 sm:grid-cols-[140px_minmax(0,1fr)]">
           <div>
             <Label>Image</Label>
             <button
@@ -312,7 +312,7 @@ function LaunchForm() {
           </div>
 
           <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
+            <div className="grid min-w-0 gap-4 sm:grid-cols-[minmax(0,1fr)_140px]">
               <div>
                 <Label>Name</Label>
                 <Input value={name} onChange={setName} placeholder="Bunker Coin" maxLength={32} />
@@ -473,8 +473,8 @@ function LaunchForm() {
               </li>
             ))}
           </ol>
-          {error && <p className="mt-4 text-[12.5px] text-down">{error}</p>}
-          <GatedButton className="mt-5 w-full" disabled={!valid || uploading} busy={running} onClick={() => void launch()}>
+          {error && <p className="mt-4 break-words text-[12.5px] text-down [overflow-wrap:anywhere]">{error}</p>}
+          <GatedButton className="mt-5 w-full min-w-0 max-w-full whitespace-normal text-center" disabled={!valid || uploading} busy={running} onClick={() => void launch()}>
             {running
               ? "Launching…"
               : quantum
@@ -487,7 +487,7 @@ function LaunchForm() {
         </div>
       </Panel>
 
-      <aside className="space-y-4">
+      <aside className="min-w-0 space-y-4">
         {quantum && <QuantumChecklist leaf={leaf} vault={vault} hardened={Boolean(unlocked?.hardened)} devBuy={devBuyNum} />}
         <div>
           <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">Preview</div>
