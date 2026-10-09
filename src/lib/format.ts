@@ -57,3 +57,31 @@ export function keepKnown<T extends Record<string, unknown>>(prev: T | null | un
   for (const [k, v] of Object.entries(prev)) if (out[k] == null && v != null) out[k] = v;
   return out as T;
 }
+
+const PINATA_HOST = (() => {
+  try {
+    const g = process.env.NEXT_PUBLIC_PINATA_GATEWAY ?? "";
+    return g ? new URL(/^https?:/.test(g) ? g : `https://${g}`).hostname : "";
+  } catch {
+    return "";
+  }
+})();
+
+/**
+ * A small, square version of a coin image. Uploads are often multi-MB (BNKR's
+ * is 3.4 MB) but shown at 56px; our Pinata gateway resizes on the fly, which
+ * turns that into ~5 KB. Other hosts are returned unchanged.
+ */
+export function thumb<T extends string | null | undefined>(url: T, px: number): T {
+  if (!url || !PINATA_HOST) return url;
+  try {
+    const u = new URL(url);
+    if (u.hostname !== PINATA_HOST) return url;
+    u.searchParams.set("img-width", String(px));
+    u.searchParams.set("img-height", String(px));
+    u.searchParams.set("img-fit", "cover");
+    return u.toString() as T;
+  } catch {
+    return url;
+  }
+}

@@ -119,3 +119,18 @@ export async function invalidate(prefix: string) {
     // Expiry still bounds staleness.
   }
 }
+
+/** Reads a value written with `store` (memory first, then Redis). */
+export async function getStored<T>(key: string): Promise<T | undefined> {
+  const hit = memory.get(key);
+  if (hit && hit.expires > Date.now()) return hit.value as T;
+  const remote = await l2Get<T>(key);
+  if (remote !== undefined) memory.set(key, { value: remote, expires: Date.now() + L1_MAX_MS });
+  return remote;
+}
+
+/** Writes a value directly (no loader), shared across instances through Redis. */
+export function store(key: string, value: unknown, ttlMs: number) {
+  memory.set(key, { value, expires: Date.now() + Math.min(ttlMs, L1_MAX_MS) });
+  l2Set(key, value, ttlMs);
+}

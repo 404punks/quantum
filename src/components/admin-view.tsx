@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowUpRight, Loader2 } from "lucide-react";
-import { ago, short } from "@/lib/format";
+import { ago, short, thumb } from "@/lib/format";
 import { CoinCard } from "./coin-card";
 import { Button, Panel, Skeleton } from "./ui";
 
@@ -252,7 +252,7 @@ function Dashboard({ state, reload }: { state: Extract<State, { admin: true }>; 
               <ul className="divide-y divide-line">
                 {imports.map((i) => (
                   <li key={i.mint} className="flex items-center gap-3 px-5 py-3">
-                    {i.pqc_launches?.image_url && <img src={i.pqc_launches.image_url} alt="" className="h-8 w-8 rounded-md border border-line object-cover" />}
+                    {i.pqc_launches?.image_url && <img src={thumb(i.pqc_launches.image_url, 64)} alt="" className="h-8 w-8 rounded-md border border-line object-cover" />}
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[13px] font-medium">{i.pqc_launches?.name ?? short(i.mint)}</div>
                       <div className="font-mono text-[11px] text-dim">

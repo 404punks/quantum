@@ -9,7 +9,7 @@ import { proofDigest } from "@/lib/pq/messages";
 import { SCHEMES, isSchemeId } from "@/lib/pq/scheme-info";
 import { verifyLaunch, type LaunchVerification } from "@/lib/pq/verify-launch";
 import type { VerifyTrace } from "@/lib/pq/xmss";
-import { cn, short } from "@/lib/format";
+import { cn, short, thumb } from "@/lib/format";
 import { useIdentity } from "./identity";
 import { GatedButton } from "./unlock";
 import { LaunchVerificationView, VerifyTraceView } from "./verify-trace";
@@ -284,7 +284,7 @@ function VerifyCoin({ initialMint }: { initialMint: string }) {
         <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
           <Panel className="p-6">
             <div className="flex items-center gap-3">
-              <img src={data.launch.image_url} alt="" className="h-12 w-12 rounded-xl border border-line object-cover" />
+              <img src={thumb(data.launch.image_url, 96)} alt="" className="h-12 w-12 rounded-xl border border-line object-cover" />
               <div>
                 <Link href={`/coin/${data.launch.mint}`} className="cursor-pointer text-[15px] font-semibold hover:underline">
                   {data.launch.name}

@@ -3,6 +3,7 @@ import { cached } from "./cache";
 import { curveMarketCapsUsd } from "./curve-usd";
 import { dexStatsChecked, solPrice } from "./dexscreener";
 import { holderCounts } from "./holders";
+import { fillFromLastKnown, remember } from "./last-known";
 import { curveStates, type CurveState } from "./solana";
 
 export type RankSort = "mcap" | "volume" | "holders";
@@ -22,6 +23,8 @@ async function curvesFor(mints: string[]): Promise<Record<string, CurveState>> {
 async function metric(mints: string[], sort: RankSort): Promise<{ values: Record<string, number>; complete: boolean }> {
   if (sort === "holders") {
     const values = await holderCounts(mints);
+    void remember("holders", values);
+    await fillFromLastKnown("holders", mints, values);
     return { values, complete: Object.keys(values).length >= mints.length * 0.98 };
   }
   const { stats, incomplete } = await dexStatsChecked(mints);
@@ -30,17 +33,23 @@ async function metric(mints: string[], sort: RankSort): Promise<{ values: Record
     const v = sort === "mcap" ? stats[m]?.marketCap : stats[m]?.volume24h;
     if (typeof v === "number") values[m] = v;
   }
-  if (sort === "volume") return { values, complete: !incomplete };
+  const metricName = sort === "mcap" ? "mcap" : "volume";
+  void remember(metricName, values);
+  // A coin a failed batch missed keeps its last known value instead of sinking.
+  const filled = await fillFromLastKnown(metricName, mints, values);
+  if (sort === "volume") return { values, complete: !incomplete || filled > 0 };
 
   // Market cap: anything DexScreener didn't return is priced from its bonding
   // curve, SOL-paired or token-paired (via the pair token's USD price).
   const missing = mints.filter((m) => values[m] === undefined);
   if (missing.length) {
     const [sol, curves] = await Promise.all([solPrice().catch(() => null), curvesFor(missing).catch(() => ({}) as Record<string, CurveState>)]);
-    Object.assign(values, await curveMarketCapsUsd(curves, sol).catch(() => ({})));
+    const fromCurve = await curveMarketCapsUsd(curves, sol).catch(() => ({}) as Record<string, number>);
+    Object.assign(values, fromCurve);
+    void remember("mcap", fromCurve);
   }
   const stillMissing = mints.filter((m) => values[m] === undefined).length;
-  return { values, complete: !incomplete && stillMissing <= Math.max(2, mints.length * 0.02) };
+  return { values, complete: stillMissing <= Math.max(2, mints.length * 0.02) && (!incomplete || filled > 0) };
 }
 
 /** An order computed from partial data: served for this request, never cached. */

@@ -1,6 +1,7 @@
 import { curveMarketCapsUsd } from "@/lib/server/curve-usd";
 import { dexStats, solPrice } from "@/lib/server/dexscreener";
 import { holderCounts } from "@/lib/server/holders";
+import { lastKnown, remember } from "@/lib/server/last-known";
 import { curveStates } from "@/lib/server/solana";
 import { isPubkey } from "@/lib/server/validate";
 
@@ -24,6 +25,17 @@ export async function GET(request: Request) {
   ]);
 
   const curveUsd = await curveMarketCapsUsd(curves, sol).catch(() => ({}) as Record<string, number>);
+  const [knownMcap, knownVol, knownHolders] = await Promise.all([lastKnown("mcap"), lastKnown("volume"), lastKnown("holders")]);
+  const fresh = { mcap: {} as Record<string, number>, volume: {} as Record<string, number> };
+  for (const m of mints) {
+    const d = stats[m];
+    if (d?.marketCap) fresh.mcap[m] = d.marketCap;
+    else if (curveUsd[m]) fresh.mcap[m] = curveUsd[m];
+    if (d?.volume24h) fresh.volume[m] = d.volume24h;
+  }
+  void remember("mcap", fresh.mcap);
+  void remember("volume", fresh.volume);
+  void remember("holders", holders);
   const tokens = Object.fromEntries(
     mints.map((mint) => {
       const d = stats[mint];
@@ -33,9 +45,9 @@ export async function GET(request: Request) {
         {
           price: d?.price ?? null,
           change24h: d?.change24h ?? null,
-          marketCap: d?.marketCap ?? curveUsd[mint] ?? null,
-          volume24h: d?.volume24h ?? null,
-          holders: holders[mint] ?? null,
+          marketCap: d?.marketCap ?? curveUsd[mint] ?? knownMcap[mint] ?? null,
+          volume24h: d?.volume24h ?? knownVol[mint] ?? null,
+          holders: holders[mint] ?? knownHolders[mint] ?? null,
           curve,
           indexed: Boolean(d),
         },

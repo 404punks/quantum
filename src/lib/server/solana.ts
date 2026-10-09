@@ -39,7 +39,7 @@ export type CurveState = {
 /** Curve state for many mints in one RPC round trip. Missing curves are omitted. */
 export async function curveStates(mints: string[]): Promise<Record<string, CurveState>> {
   if (!mints.length) return {};
-  const key = `curves:v2:${[...mints].sort().join(",")}`;
+  const key = `curves:v3:${[...mints].sort().join(",")}`;
   return cached(key, 15_000, async () => {
     const global = await fetchGlobal();
     const infos = await connection.getMultipleAccountsInfo(mints.map((m) => bondingCurvePda(m)));
@@ -51,14 +51,15 @@ export async function curveStates(mints: string[]): Promise<Record<string, Curve
       if (!curve) return;
       const sold = initial.sub(curve.realTokenReserves);
       const solQuoted = curve.quoteMint.equals(PublicKey.default) || curve.quoteMint.equals(NATIVE_MINT);
-      const raw = curve.virtualTokenReserves.isZero()
-        ? 0
+      // After graduation the curve is emptied; it can't price the coin (null, never $0).
+      const raw = curve.complete || curve.virtualTokenReserves.isZero()
+        ? null
         : bondingCurveMarketCap({
             mintSupply: curve.tokenTotalSupply,
             virtualQuoteReserves: curve.virtualQuoteReserves,
             virtualTokenReserves: curve.virtualTokenReserves,
           }).toNumber();
-      const mcap = solQuoted ? raw / LAMPORTS_PER_SOL : null;
+      const mcap = solQuoted && raw !== null ? raw / LAMPORTS_PER_SOL : null;
       out[mints[i]] = {
         complete: curve.complete,
         progress: curve.complete ? 1 : Math.max(0, Math.min(1, sold.toNumber() / initial.toNumber())),

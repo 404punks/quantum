@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { LaunchItem, MarketItem } from "@/lib/types";
-import { ago, cn, coinPath, num, pct, usd } from "@/lib/format";
+import { ago, cn, coinPath, num, pct, usd, thumb } from "@/lib/format";
 import { SCHEMES, type SchemeId } from "@/lib/pq/scheme-info";
 import { Lock } from "lucide-react";
 import { DigestGrid } from "./digest-grid";
@@ -45,7 +45,7 @@ export function CoinCard({
       <header className="flex items-start gap-3">
         <div className="h-14 w-14 shrink-0 overflow-hidden border border-line bg-surface-2">
           {launch.image_url ? (
-            <img src={launch.image_url} alt="" className="h-full w-full object-cover" loading="lazy" />
+            <img src={thumb(launch.image_url, 112)} alt="" className="h-full w-full object-cover" loading="lazy" />
           ) : (
             <div className="flex h-full w-full items-center justify-center font-serif text-lg text-dim">{launch.symbol?.[0] ?? "?"}</div>
           )}

@@ -7,7 +7,7 @@ import { Anchor, ArrowUpRight, Check, Fingerprint, Globe, Lock, MessageCircle, S
 import { SCHEMES, isSchemeId } from "@/lib/pq/scheme-info";
 import { verifyLaunch, type LaunchVerification } from "@/lib/pq/verify-launch";
 import type { CurveState } from "@/lib/types";
-import { ago, cn, coinPath, num, pct, price, short, usd, keepKnown } from "@/lib/format";
+import { ago, cn, coinPath, num, pct, price, short, usd, keepKnown, thumb } from "@/lib/format";
 import { LaunchVerificationView } from "./verify-trace";
 import { Button, CopyText, Panel, Pill, Skeleton } from "./ui";
 
@@ -145,7 +145,7 @@ export function CoinView({ mint, quantumRoute = false }: { mint: string; quantum
 
       <header className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <img src={launch.image_url} alt="" className="h-16 w-16 rounded-xl border border-line object-cover" />
+          <img src={thumb(launch.image_url, 128)} alt="" className="h-16 w-16 rounded-xl border border-line object-cover" />
           <div>
             <h1 className="flex flex-wrap items-center gap-2 text-[22px] font-semibold">
               {launch.name}
