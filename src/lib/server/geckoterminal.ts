@@ -4,7 +4,7 @@ import { cached } from "./cache";
 /**
  * GeckoTerminal OHLCV: free and keyless, works for pump.fun bonding-curve
  * pools and PumpSwap pools alike. The free tier allows ~30 requests/min, so
- * every chart is cached for 30s and shared across visitors and instances.
+ * every chart is cached for 60s and shared across visitors and instances.
  * Failures throw, so a rate-limited response is never cached as an empty chart.
  */
 
@@ -31,7 +31,7 @@ export async function poolCandles(pool: string, tf: Timeframe): Promise<Candle[]
 }
 
 function fetchCandles(key: string, pool: string, tf: Timeframe): Promise<Candle[]> {
-  return cached(key, 30_000, async () => {
+  return cached(key, 60_000, async () => {
     const res = await fetch(`${BASE}${pool}/ohlcv/${tf.unit}?aggregate=${tf.aggregate}&limit=${tf.limit}&currency=usd&token=base`, {
       headers: { accept: "application/json" },
       cache: "no-store",

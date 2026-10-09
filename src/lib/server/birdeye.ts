@@ -31,6 +31,23 @@ async function birdeye<T>(path: string): Promise<T | null> {
   return json.success ? (json.data ?? null) : null;
 }
 
+export type Candle = { t: number; o: number; h: number; l: number; c: number; v: number };
+
+/**
+ * Chart fallback when GeckoTerminal is rate-limited (its free tier is per IP,
+ * and cloud egress IPs are shared). Throws on failure so nothing empty is cached.
+ */
+export function ohlcv(mint: string, type: "1m" | "15m" | "1H" | "4H", seconds: number) {
+  return cached(`be:ohlcv:${mint}:${type}:${seconds}`, 60_000, async () => {
+    const to = Math.floor(Date.now() / 1000);
+    const data = await birdeye<{ items: { unix_time: number; o: number; h: number; l: number; c: number; v_usd: number }[] }>(
+      `/defi/v3/ohlcv?address=${mint}&type=${type}&time_from=${to - seconds}&time_to=${to}`,
+    );
+    if (!data) throw new Error("birdeye ohlcv unavailable");
+    return data.items.map((x): Candle => ({ t: x.unix_time, o: x.o, h: x.h, l: x.l, c: x.c, v: x.v_usd }));
+  });
+}
+
 export type TokenMeta = {
   address: string;
   name: string;

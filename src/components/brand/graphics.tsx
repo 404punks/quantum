@@ -10,6 +10,7 @@ import { MONO, SANS, SERIF } from "./fonts";
 import { AllSchemesTweet, MoreSchemesTweet, SceneAllSchemesTweet, SchemesTweet } from "./schemes-graphic";
 import { WalletsFingerprintScene, WalletsFingerprintTweet, WalletsLaunchScene, WalletsLaunchTweet } from "./wallet-graphics";
 import { VaultAuthScene, VaultBreakdownScene } from "./vault-graphics";
+import { PqcTokenTweet } from "./token-graphics";
 import { SceneAvatar, SceneBunkerMode, SceneHeader, SceneIntro, ScenePortrait, SceneProof, SceneSquare } from "./scene-graphics";
 
 /**
@@ -529,6 +530,7 @@ export function ProfilePicture() {
 export type Graphic = { id: string; title: string; note: string; w: number; h: number; group: string; Component: () => ReactNode };
 
 export const GRAPHICS: Graphic[] = [
+  { id: "pqc-token", title: "$PQC coin page", note: "Platform token · live chart snippet", w: 1600, h: 900, group: "Platform token", Component: PqcTokenTweet },
   { id: "vault-breakdown-bunker", title: "How a quantum vault works", note: "Technical breakdown · artwork", w: 1600, h: 900, group: "Vault", Component: VaultBreakdownScene },
   { id: "vault-auth-bunker", title: "Only one signature unlocks the vault", note: "Vault authorization · artwork", w: 1600, h: 900, group: "Vault", Component: VaultAuthScene },
   { id: "wallets-launch", title: "Post-quantum wallets", note: "Wallet launch", w: 1600, h: 900, group: "Wallets", Component: WalletsLaunchTweet },

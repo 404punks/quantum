@@ -1,3 +1,4 @@
+import { ohlcv } from "@/lib/server/birdeye";
 import { dexStats, solPrice } from "@/lib/server/dexscreener";
 import { poolCandles, type Timeframe } from "@/lib/server/geckoterminal";
 import { holderCount } from "@/lib/server/holders";
@@ -5,12 +6,30 @@ import { curveStates } from "@/lib/server/solana";
 import { db } from "@/lib/server/supabase";
 import { bad, isPubkey } from "@/lib/server/validate";
 
-const RANGES: Record<string, Timeframe> = {
-  "1H": { unit: "minute", aggregate: 1, limit: 60 },
-  "1D": { unit: "minute", aggregate: 15, limit: 96 },
-  "1W": { unit: "hour", aggregate: 1, limit: 168 },
-  "1M": { unit: "hour", aggregate: 4, limit: 180 },
+type Range = { gecko: Timeframe; birdeye: { type: "1m" | "15m" | "1H" | "4H"; seconds: number } };
+
+const RANGES: Record<string, Range> = {
+  "1H": { gecko: { unit: "minute", aggregate: 1, limit: 60 }, birdeye: { type: "1m", seconds: 3600 } },
+  "1D": { gecko: { unit: "minute", aggregate: 15, limit: 96 }, birdeye: { type: "15m", seconds: 86_400 } },
+  "1W": { gecko: { unit: "hour", aggregate: 1, limit: 168 }, birdeye: { type: "1H", seconds: 7 * 86_400 } },
+  "1M": { gecko: { unit: "hour", aggregate: 4, limit: 180 }, birdeye: { type: "4H", seconds: 30 * 86_400 } },
 };
+
+/**
+ * GeckoTerminal first (keyless). Its free limit is per IP and cloud egress IPs
+ * are shared, so when it is rate-limited (or the pool lookup failed) Birdeye,
+ * which needs only the mint, fills in. Throws only if both fail.
+ */
+async function chartCandles(mint: string, pool: string | null, range: Range) {
+  if (pool) {
+    try {
+      return await poolCandles(pool, range.gecko);
+    } catch {
+      // fall through to Birdeye
+    }
+  }
+  return ohlcv(mint, range.birdeye.type, range.birdeye.seconds);
+}
 
 export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]">) {
   const { mint } = await ctx.params;
@@ -34,14 +53,12 @@ export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]
     solPrice().catch(() => null),
   ]);
   const d = stats[mint];
-  // candlesOk=false means the chart source failed (not "no trades"), so the page keeps what it has.
+  // candlesOk=false means every chart source failed (not "no trades"), so the page keeps what it has.
   let candlesOk = true;
-  const candles = d?.pair
-    ? await poolCandles(d.pair, range).catch(() => {
-        candlesOk = false;
-        return [];
-      })
-    : [];
+  const candles = await chartCandles(mint, d?.pair ?? null, range).catch(() => {
+    candlesOk = false;
+    return [];
+  });
   const overview =
     d || holders !== null
       ? {
