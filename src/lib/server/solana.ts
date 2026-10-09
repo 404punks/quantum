@@ -4,9 +4,35 @@ import { Connection, PublicKey, type AddressLookupTableAccount } from "@solana/w
 import { OnlinePumpSdk, PumpSdk, bondingCurvePda, bondingCurveMarketCap } from "@pump-fun/pump-sdk";
 import { cached } from "./cache";
 
-export const connection = new Connection(process.env.HELIUS_RPC_URL!, "confirmed");
+function rpcUrl() {
+  const url = process.env.HELIUS_RPC_URL?.trim() ?? "";
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    throw new Error("HELIUS_RPC_URL must start with http: or https:");
+  }
+  return url;
+}
+
+let rpc: Connection | undefined;
+function solanaConnection() {
+  rpc ??= new Connection(rpcUrl(), "confirmed");
+  return rpc;
+}
+
+/** Deferred so `next build` can import routes before the RPC env is present. */
+function lazy<T extends object>(create: () => T): T {
+  return new Proxy({} as T, {
+    get(_target, prop) {
+      const real = create();
+      const value = Reflect.get(real, prop, real);
+      return typeof value === "function" ? value.bind(real) : value;
+    },
+  });
+}
+
+export const connection = lazy(solanaConnection);
 export const pumpSdk = new PumpSdk();
-export const onlinePump = new OnlinePumpSdk(connection);
+let online: OnlinePumpSdk | undefined;
+export const onlinePump = lazy(() => (online ??= new OnlinePumpSdk(solanaConnection())));
 
 export const LAMPORTS_PER_SOL = 1_000_000_000;
 export const MEMO_PROGRAM_ID = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");

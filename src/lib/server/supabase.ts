@@ -1,9 +1,26 @@
 import "server-only";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-/** Service-role client. Server routes only; bypasses RLS for writes. */
-export const db = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-  auth: { persistSession: false },
+let client: SupabaseClient | undefined;
+
+function supabase() {
+  if (!client) {
+    const url = process.env.SUPABASE_URL?.trim() ?? "";
+    if (!url) throw new Error("supabaseUrl is required.");
+    client = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY ?? "", {
+      auth: { persistSession: false },
+    });
+  }
+  return client;
+}
+
+/** Service-role client. Server routes only; bypasses RLS for writes. Created on first use so route imports survive a build without env. */
+export const db: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const real = supabase();
+    const value = Reflect.get(real, prop, real);
+    return typeof value === "function" ? value.bind(real) : value;
+  },
 });
 
 export type IdentityRow = {
