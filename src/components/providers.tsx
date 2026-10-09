@@ -20,9 +20,9 @@ createAppKit({
   },
   themeMode: "dark",
   themeVariables: {
-    "--w3m-accent": "#ececec",
+    "--w3m-accent": "#ccff00",
     "--w3m-border-radius-master": "1px",
-    "--w3m-font-family": "var(--font-geist-sans)",
+    "--w3m-font-family": "var(--font-quantum-mono)",
   },
   features: { analytics: false, email: false, socials: false, swaps: false, onramp: false },
 });
