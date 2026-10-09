@@ -82,16 +82,16 @@ export function ButtonLink({
 
 export function buttonClass(variant: ButtonProps["variant"] = "outline", size: ButtonProps["size"] = "md") {
   return cn(
-    "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-    size === "sm" ? "px-3.5 py-1.5 text-[12px]" : "px-5 py-2.5 text-[13px]",
-    variant === "primary" && "bg-white text-black font-semibold hover:bg-neutral-200",
-    variant === "outline" && "border border-line bg-surface text-fg hover:border-line-strong hover:bg-surface-2",
+    "pixel-panel inline-flex cursor-pointer items-center justify-center gap-1.5 font-mono font-semibold uppercase tracking-[0.08em] transition-all disabled:cursor-not-allowed disabled:opacity-40",
+    size === "sm" ? "px-3.5 py-1.5 text-[11px]" : "px-5 py-2.5 text-[12px]",
+    variant === "primary" && "bg-up text-bg shadow-[0_0_20px_rgba(204,255,0,0.18)] hover:bg-up/80 hover:shadow-[0_0_28px_rgba(204,255,0,0.32)]",
+    variant === "outline" && "border border-line-strong bg-surface/80 text-fg hover:border-up/50 hover:bg-up/5 hover:text-up",
     variant === "ghost" && "text-muted hover:bg-surface-2 hover:text-fg",
   );
 }
 
 export function Panel({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cn("rounded-xl border border-line bg-surface", className)}>{children}</section>;
+  return <section className={cn("pixel-panel glass", className)}>{children}</section>;
 }
 
 export function Mono({ children, className }: { children: ReactNode; className?: string }) {

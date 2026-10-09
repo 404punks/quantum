@@ -13,7 +13,7 @@ createAppKit({
   defaultNetwork: solana,
   projectId: process.env.NEXT_PUBLIC_PROJECT_ID!,
   metadata: {
-    name: "pqc.market",
+    name: "quantum",
     description: "Post-quantum launchpad",
     url: "https://pqc.market",
     icons: [],

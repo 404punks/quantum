@@ -26,11 +26,11 @@ export function Navbar() {
   return (
     <>
       <IdentityBanner />
-      <header className="sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
+      <header className="sticky top-0 z-40 border-b border-line bg-bg/75 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-8">
           <Link href="/" className="flex cursor-pointer items-center gap-2.5 transition-opacity hover:opacity-80">
             <Image src="/logo-mark.png" alt="" width={34} height={34} priority />
-            <span className="font-serif text-[18px] font-bold tracking-tight">pqc.market</span>
+            <span className="font-serif text-[19px] font-bold uppercase tracking-[0.16em] text-up">quantum</span>
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
@@ -39,18 +39,18 @@ export function Navbar() {
                 key={href}
                 href={href}
                 className={cn(
-                  "cursor-pointer rounded-md px-3 py-1.5 text-[13.5px] transition-colors",
-                  isActive(href) ? "text-fg" : "text-muted hover:bg-surface-2 hover:text-fg",
+                  "cursor-pointer px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors",
+                  isActive(href) ? "text-up" : "text-muted hover:bg-up/5 hover:text-up",
                 )}
               >
                 {label}
               </Link>
             ))}
             <a
-              href="https://github.com/pqcmarket"
+              href="https://github.com/404punks/quantum"
               target="_blank"
               rel="noreferrer"
-              className="cursor-pointer rounded-md px-3 py-1.5 text-[13.5px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+              className="cursor-pointer px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted transition-colors hover:bg-up/5 hover:text-up"
             >
               GitHub
             </a>
@@ -84,7 +84,7 @@ export function Navbar() {
               </Link>
             ))}
             <a
-              href="https://github.com/pqcmarket"
+              href="https://github.com/404punks/quantum"
               target="_blank"
               rel="noreferrer"
               onClick={() => setOpen(false)}
@@ -121,7 +121,7 @@ function WalletMenu() {
     return (
       <button
         onClick={connect}
-        className="cursor-pointer rounded-md bg-white px-4 py-2 text-[13px] font-semibold text-black transition-colors hover:bg-neutral-200"
+        className="pixel-panel cursor-pointer bg-up px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bg transition-all hover:bg-up/80 hover:shadow-[0_0_20px_rgba(204,255,0,0.25)]"
       >
         Connect Wallet
       </button>

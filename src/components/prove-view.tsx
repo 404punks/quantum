@@ -271,7 +271,7 @@ function VerifyCoin({ initialMint }: { initialMint: string }) {
         <input
           value={mint}
           onChange={(e) => setMint(e.target.value)}
-          placeholder="Paste a pqc.market mint address…"
+          placeholder="Paste a quantum mint address…"
           className="h-10 flex-1 rounded-l-[3px] border border-r-0 border-line bg-surface px-3 font-mono text-[12.5px] outline-none placeholder:font-sans placeholder:text-dim focus:border-line-strong"
         />
         <button type="submit" className="flex h-10 cursor-pointer items-center gap-1.5 rounded-r-[3px] bg-fg px-4 text-[13px] font-medium text-bg hover:bg-white">

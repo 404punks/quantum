@@ -45,7 +45,7 @@ export default function Page() {
 
         <article className="min-w-0 max-w-3xl">
           <div className="font-mono text-[11.5px] text-dim">docs / protocol v1</div>
-          <h1 className="mt-3 font-serif text-[36px] font-bold leading-tight tracking-tight sm:text-[44px]">How pqc.market works</h1>
+          <h1 className="mt-3 font-serif text-[36px] font-bold uppercase leading-tight tracking-tight sm:text-[44px]">How quantum works</h1>
           <p className="mt-4 text-[15px] leading-relaxed text-muted">
             A specification of the hash-based identity, attestation and proof protocol behind every launch. Everything below is
             implemented in <Code>src/lib/pq</Code> and runs identically in the browser and on the server.
@@ -229,7 +229,7 @@ export default function Page() {
             <Sub id="fees" title="Creator fees">
               <P>
                 pump.fun fixes a coin&apos;s fee recipient at mint time via the <Code>creator</Code> field of <Code>create_v2</Code>. Every
-                pqc.market coin sets it to the platform treasury; the launching wallet is the signer and fee payer, and is recorded
+                quantum coin sets it to the platform treasury; the launching wallet is the signer and fee payer, and is recorded
                 as the creator in the attestation.
               </P>
             </Sub>
@@ -296,7 +296,7 @@ export default function Page() {
 
           <Section id="wallets" title="Wallets">
             <P>
-              A pqc.market wallet is an ed25519 keypair derived from the identity seed (<Code>HKDF(sk.seed, &quot;pqc.market/wallet/v1&quot;, index)</Code>),
+              A quantum wallet is an ed25519 keypair derived from the identity seed (<Code>HKDF(sk.seed, &quot;pqc.market/wallet/v1&quot;, index)</Code>),
               re-derived in the browser after unlock and never stored. Registration is a statement signed by the derived key itself, so the
               server only ever holds public addresses.
             </P>
