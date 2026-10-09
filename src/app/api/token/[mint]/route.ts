@@ -72,7 +72,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]
   const range = RANGES[new URL(request.url).searchParams.get("range") ?? "1D"] ?? RANGES["1D"];
 
   const launch = await launchRow(mint);
-  if (!launch) return bad("Not a pqc.market launch", 404);
+  if (!launch) return bad("Not a quantum launch", 404);
 
   // Stats from DexScreener + Helius; candles from GeckoTerminal for the coin's deepest pool.
   const [stats, holders, curves, sol] = await Promise.all([

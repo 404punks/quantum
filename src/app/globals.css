@@ -35,6 +35,7 @@
 
 html {
   color-scheme: dark;
+  overflow-x: clip;
 }
 
 body {
@@ -44,7 +45,6 @@ body {
   background-image:
     radial-gradient(110% 80% at 50% -10%, rgba(204, 255, 0, 0.1) 0, transparent 60%),
     radial-gradient(80% 60% at 90% 10%, rgba(127, 231, 216, 0.08) 0, transparent 65%);
-  background-attachment: fixed;
 }
 
 /* Fine technical grid, fixed above the ambient glows and below the content. */

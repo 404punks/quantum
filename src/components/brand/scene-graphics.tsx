@@ -218,7 +218,7 @@ export function SceneHeader() {
           Launch coins that survive <Accent>Q-day</Accent>.
         </Headline>
         <Mono size={19} color={MUTED} style={{ marginTop: 20 }}>
-          pqc.market · post-quantum launchpad on pump.fun
+          quantum · post-quantum launchpad on pump.fun
         </Mono>
         <div style={{ marginTop: 26 }}>
           <DigestCells digits={s.digits} cell={11} gap={3} />
@@ -235,7 +235,7 @@ export function SceneAvatar() {
       <Shade style={{ background: "radial-gradient(circle at 50% 50%, rgba(18,17,16,0) 40%, rgba(18,17,16,0.85) 100%)" }} />
       <Shade style={{ boxShadow: `inset 0 0 0 2px ${LINE_STRONG}` }} />
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 26, textAlign: "center", fontFamily: "'PQC Serif', serif", fontWeight: 700, fontSize: 30, color: FG, textShadow: "0 2px 14px rgba(0,0,0,0.9)" }}>
-        pqc.market
+        quantum
       </div>
     </Frame>
   );

@@ -269,7 +269,7 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
     () => ({
       wallet,
       connected: Boolean(wallet),
-      connect: () => void open(),
+      connect: () => void open({ view: "Connect", namespace: "solana" }),
       disconnect: () => void disconnect(),
       remote,
       leaves,

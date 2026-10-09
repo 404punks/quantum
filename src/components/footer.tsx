@@ -15,9 +15,6 @@ export function Footer() {
           <a href="https://pump.fun" target="_blank" rel="noreferrer" className="cursor-pointer hover:text-fg">
             Built on pump.fun
           </a>
-          <a href="https://github.com/404punks/quantum" target="_blank" rel="noreferrer" className="cursor-pointer hover:text-up">
-            GitHub
-          </a>
         </div>
       </div>
     </footer>

@@ -89,7 +89,7 @@ export function ProofAnimation({ className }: { className?: string }) {
         <span>wots-sha256 · w=16</span>
       </div>
 
-      <div className="p-4">
+      <div className="max-w-full overflow-x-auto p-4">
         <div className="text-muted">
           <span className="text-up">quantum@node</span>:<span className="text-fg">~</span>$ wots verify --live
         </div>

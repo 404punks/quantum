@@ -200,7 +200,7 @@ function Dashboard({ state, reload }: { state: Extract<State, { admin: true }>; 
             </form>
             <p className="mt-2 text-[11.5px] text-dim">
               Name and ticker come from Birdeye, creator and launch time from the creation transaction. The image is always the
-              pqc.market logo.
+              quantum logo.
             </p>
             {error && <p className="mt-3 text-[12.5px] text-down">{error}</p>}
             {done && (

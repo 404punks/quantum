@@ -19,7 +19,7 @@ export type ImportPreview = {
 /** Everything needed to import a coin, derived from its contract address alone. */
 export async function resolveImport(mint: string): Promise<ImportPreview> {
   const { data: existing } = await db.from("pqc_launches").select("mint").eq("mint", mint).maybeSingle();
-  if (existing) throw new ImportError("Already listed on pqc.market", 409);
+  if (existing) throw new ImportError("Already listed on quantum", 409);
 
   const [meta, creation, curves] = await Promise.all([
     tokenMeta(mint).catch(() => null),
