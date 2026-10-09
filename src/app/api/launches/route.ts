@@ -50,7 +50,9 @@ async function list(params: URLSearchParams) {
   let idQuery = db.from("pqc_launches").select("mint").eq("status", "live").order("launched_at", { ascending: false });
   if (q) {
     const safe = q.replace(/[%,()]/g, "");
-    idQuery = idQuery.or(`name.ilike.%${safe}%,symbol.ilike.%${safe}%,mint.eq.${safe}`);
+    // Name or ticker anywhere; a contract address in full or by its first characters.
+    const mintPrefix = /^[1-9A-HJ-NP-Za-km-z]{4,44}$/.test(safe) ? `,mint.like.${safe}*` : "";
+    idQuery = idQuery.or(`name.ilike.%${safe}%,symbol.ilike.%${safe}%,mint.eq.${safe}${mintPrefix}`);
   }
   if (creator) idQuery = idQuery.eq("creator", creator);
   // Quantum launches delivered their dev buy into a pqc-vault.

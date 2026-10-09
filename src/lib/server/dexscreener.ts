@@ -23,6 +23,7 @@ type Pair = {
   volume?: { h24?: number };
   priceChange?: { h24?: number };
   txns?: { h24?: { buys: number; sells: number } };
+  info?: { imageUrl?: string };
 };
 
 export type DexStats = {
@@ -35,6 +36,8 @@ export type DexStats = {
   sells24h: number | null;
   dex: string;
   pair: string;
+  /** DexScreener's own optimized copy of the token logo, when it has one. */
+  image: string | null;
 };
 
 /** Throws on failure so an empty result is never cached. */
@@ -76,26 +79,37 @@ function toStats(p: Pair): DexStats {
     sells24h: num(p.txns?.h24?.sells),
     dex: p.dexId,
     pair: p.pairAddress,
+    image: p.info?.imageUrl ?? null,
   };
 }
 
-/** Stats for many mints: one request per 30, cached 20s and shared across instances. Unlisted mints are absent. */
-export async function dexStats(mints: string[]): Promise<Record<string, DexStats>> {
+/**
+ * Stats for many mints: one request per 30, cached 20s and shared across
+ * instances. Unlisted mints are absent; `incomplete` says whether any batch
+ * failed (so a missing mint may just be missing data, not unlisted).
+ */
+export async function dexStatsChecked(mints: string[]): Promise<{ stats: Record<string, DexStats>; incomplete: boolean }> {
   const list = [...new Set(mints)].sort();
   const chunks: string[][] = [];
   for (let i = 0; i < list.length; i += CHUNK) chunks.push(list.slice(i, i + CHUNK));
+  let incomplete = false;
   const parts = await Promise.all(
     chunks.map((chunk) =>
-      cached(`dex:${chunk.join(",")}`, 20_000, async () => {
+      cached(`dex:v2:${chunk.join(",")}`, 20_000, async () => {
         const best = bestPairs(await fetchPairs(chunk), new Set(chunk));
         return Object.fromEntries([...best].map(([m, p]) => [m, toStats(p)]));
       }).catch((err) => {
+        incomplete = true;
         console.warn("dexscreener", err instanceof Error ? err.message : err);
         return {} as Record<string, DexStats>;
       }),
     ),
   );
-  return Object.assign({}, ...parts);
+  return { stats: Object.assign({}, ...parts), incomplete };
+}
+
+export async function dexStats(mints: string[]): Promise<Record<string, DexStats>> {
+  return (await dexStatsChecked(mints)).stats;
 }
 
 /** SOL/USD from the deepest SOL-stablecoin pair. */

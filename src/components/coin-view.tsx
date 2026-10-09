@@ -81,7 +81,7 @@ export function CoinView({ mint, quantumRoute = false }: { mint: string; quantum
           if (j.error) return setError(j.error);
           if (j.candlesOk === false) {
             // Chart source busy: keep the candles already on screen and retry on the next tick.
-            setData((prev) => (prev && prev.candles.length ? { ...j, candles: prev.candles } : j));
+            setData((prev) => (prev && prev.launch.mint === mint && prev.candles.length ? { ...j, candles: prev.candles } : j));
             retry = setTimeout(load, 5_000);
             return;
           }

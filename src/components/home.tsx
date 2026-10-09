@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Search, X } from "lucide-react";
 import type { LaunchItem, MarketItem } from "@/lib/types";
 import { cn } from "@/lib/format";
 import { supabaseBrowser } from "@/lib/supabase-browser";
@@ -83,12 +83,33 @@ function CoinsSection() {
   const [kind, setKind] = useState<Kind>("all");
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Filter as you type, without a request per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(search.trim().slice(0, 44)), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // "/" jumps to the search box from anywhere on the page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (e.key !== "/" || el?.closest("input, textarea, [contenteditable]")) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Graduation is filtered on the server across every live launch, not just the loaded page.
   const listUrl = useCallback(
     (offset: number) =>
-      `/api/launches?offset=${offset}${status === "graduated" ? "&status=graduated" : ""}${sort !== "new" ? `&sort=${sort}` : ""}${kind !== "all" ? `&kind=${kind}` : ""}`,
-    [status, sort, kind],
+      `/api/launches?offset=${offset}${status === "graduated" ? "&status=graduated" : ""}${sort !== "new" ? `&sort=${sort}` : ""}${kind !== "all" ? `&kind=${kind}` : ""}${query ? `&q=${encodeURIComponent(query)}` : ""}`,
+    [status, sort, kind, query],
   );
 
   useEffect(() => {
@@ -130,6 +151,8 @@ function CoinsSection() {
   sortRef.current = sort;
   const kindRef = useRef(kind);
   kindRef.current = kind;
+  const queryRef = useRef(query);
+  queryRef.current = query;
 
   // Realtime Broadcast: the server announces each launch once it is live. No
   // database polling or per-tab RLS checks, unlike postgres_changes.
@@ -161,7 +184,7 @@ function CoinsSection() {
           hardened: false,
           anchored: false,
         };
-        if (statusRef.current !== "all" || sortRef.current !== "new") return;
+        if (statusRef.current !== "all" || sortRef.current !== "new" || queryRef.current) return;
         if ((kindRef.current === "quantum" && !item.dev_vault) || (kindRef.current === "standard" && item.dev_vault)) return;
         setLaunches((prev) => (prev && !prev.some((l) => l.mint === item.mint) ? [item, ...prev] : prev));
         setFresh((prev) => new Set(prev).add(item.mint));
@@ -235,7 +258,27 @@ function CoinsSection() {
         <p className="hidden pb-3 text-right text-[12px] text-dim md:block">{KINDS.find((k) => k.value === kind)?.hint}</p>
       </div>
       <div className="flex flex-col gap-4 pb-5 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3 md:max-w-md">
+          <label className="group flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-surface px-3 transition-colors focus-within:border-line-strong hover:border-line-strong">
+            <Search size={14} className="shrink-0 text-dim group-focus-within:text-muted" />
+            <input
+              ref={searchRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Escape" && (setSearch(""), e.currentTarget.blur())}
+              placeholder="Search name, ticker or address"
+              aria-label="Search coins"
+              spellCheck={false}
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-dim"
+            />
+            {search ? (
+              <button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="cursor-pointer text-dim transition-colors hover:text-fg">
+                <X size={14} />
+              </button>
+            ) : (
+              <kbd className="hidden rounded border border-line px-1.5 font-mono text-[10.5px] text-dim sm:inline">/</kbd>
+            )}
+          </label>
           <span
             title={live ? "New launches stream in automatically" : "Connecting to live feed"}
             className={cn("flex items-center gap-1.5 font-mono text-[11px]", live ? "text-up" : "text-dim")}
@@ -273,7 +316,21 @@ function CoinsSection() {
           ))}
         </div>
       ) : visible.length === 0 ? (
-        <Empty filtered={status !== "all" ? "graduated" : kind === "quantum" ? "quantum" : kind === "standard" ? "standard" : null} />
+        query ? (
+          <div className="flex flex-col items-center rounded-2xl border border-dashed border-line px-4 py-20 text-center">
+            <h3 className="font-serif text-[18px] font-bold">No coins match “{query}”</h3>
+            <p className="mt-2 max-w-sm text-[13px] text-muted">Try a name, a ticker, or paste a contract address.</p>
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="mt-6 cursor-pointer rounded-md border border-line bg-surface px-4 py-2 text-[13px] text-fg transition-colors hover:border-line-strong hover:bg-surface-2"
+            >
+              Clear search
+            </button>
+          </div>
+        ) : (
+          <Empty filtered={status !== "all" ? "graduated" : kind === "quantum" ? "quantum" : kind === "standard" ? "standard" : null} />
+        )
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((l) => (

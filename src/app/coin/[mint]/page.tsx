@@ -12,5 +12,6 @@ export default function Page({ params }: PageProps<"/coin/[mint]">) {
 
 async function Coin({ params }: { params: PageProps<"/coin/[mint]">["params"] }) {
   const { mint } = await params;
-  return <CoinView mint={mint} />;
+  // Keyed by mint: a different coin starts from a clean slate, never the last coin's chart.
+  return <CoinView key={mint} mint={mint} />;
 }
