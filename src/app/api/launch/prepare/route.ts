@@ -41,7 +41,11 @@ const PUMP_DECIMALS = 6;
 // On-chain creator for every launch: all creator fees accrue to the treasury vault.
 // Fixed at mint time. Individual launchers cannot claim; a keeper holding the
 // treasury key sweeps with collectCoinCreatorFeeInstructions.
-const TREASURY = new PublicKey(process.env.NEXT_PUBLIC_TREASURY!);
+function treasury() {
+  const value = process.env.NEXT_PUBLIC_TREASURY?.trim();
+  if (!value) throw new Error("NEXT_PUBLIC_TREASURY is required");
+  return new PublicKey(value);
+}
 
 /**
  * Builds the create(+buy) transaction for a PQ-attested launch.
@@ -219,7 +223,7 @@ export async function POST(request: Request) {
           name,
           symbol,
           uri,
-          creator: TREASURY,
+          creator: treasury(),
           user: u,
           amount,
           quoteAmount: quoteIn,
@@ -230,12 +234,12 @@ export async function POST(request: Request) {
         });
     } else {
       pairBuild = async (m, u) => [
-        await pumpSdk.createV2Instruction({ mint: m, name, symbol, uri, creator: TREASURY, user: u, mayhemMode: false, quoteMint: quotePk, quoteTokenProgram, pumpQuote: pumpQuote?.accounts }),
+        await pumpSdk.createV2Instruction({ mint: m, name, symbol, uri, creator: treasury(), user: u, mayhemMode: false, quoteMint: quotePk, quoteTokenProgram, pumpQuote: pumpQuote?.accounts }),
       ];
     }
     instructions = await pairBuild(mintKey, user);
   } else if (lamports.isZero()) {
-    instructions = [await pumpSdk.createV2Instruction({ mint: mintKey, name, symbol, uri, creator: TREASURY, user, mayhemMode: false })];
+    instructions = [await pumpSdk.createV2Instruction({ mint: mintKey, name, symbol, uri, creator: treasury(), user, mayhemMode: false })];
   } else {
     tokenAmount = getBuyTokenAmountFromSolAmount({ global, feeConfig, mintSupply: null, bondingCurve: null, amount: lamports, quoteMint: PublicKey.default });
     instructions = await pumpSdk.createV2AndBuyInstructions({
@@ -244,7 +248,7 @@ export async function POST(request: Request) {
       name,
       symbol,
       uri,
-      creator: TREASURY,
+      creator: treasury(),
       user,
       amount: tokenAmount,
       solAmount: lamports,
