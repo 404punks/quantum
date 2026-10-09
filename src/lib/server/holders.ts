@@ -30,7 +30,8 @@ export async function pool<T, R>(items: T[], limit: number, fn: (t: T) => Promis
 
 type TokenAccount = { owner: string; amount: number | string };
 
-async function countHolders(mint: string): Promise<number | null> {
+/** Throws on any RPC failure so a failed count is never cached. */
+async function countHolders(mint: string): Promise<number> {
   const curve = bondingCurvePda(mint).toBase58();
   let count = 0;
   for (let page = 1; page <= MAX_PAGES; page++) {
@@ -41,10 +42,10 @@ async function countHolders(mint: string): Promise<number | null> {
       cache: "no-store",
       signal: AbortSignal.timeout(10_000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) throw new Error(`helius ${res.status}`);
     const json = (await res.json()) as { result?: { token_accounts?: TokenAccount[] }; error?: unknown };
     const accounts = json.result?.token_accounts;
-    if (!accounts) return null;
+    if (!accounts) throw new Error("helius: no token_accounts");
     for (const a of accounts) if (Number(a.amount) > 0 && a.owner !== curve) count++;
     if (accounts.length < PAGE) break;
   }
@@ -52,11 +53,11 @@ async function countHolders(mint: string): Promise<number | null> {
 }
 
 export function holderCount(mint: string) {
-  return cached(`holders:${mint}`, 5 * 60_000, () => countHolders(mint).catch(() => null));
+  return cached(`holders:${mint}`, 5 * 60_000, () => countHolders(mint));
 }
 
 export async function holderCounts(mints: string[]): Promise<Record<string, number>> {
-  const counts = await pool(mints, CONCURRENCY, holderCount);
+  const counts = await pool(mints, CONCURRENCY, (m) => holderCount(m).catch(() => null));
   const out: Record<string, number> = {};
   mints.forEach((m, i) => {
     const c = counts[i];

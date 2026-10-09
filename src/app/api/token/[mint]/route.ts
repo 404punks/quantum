@@ -1,22 +1,21 @@
-import { ohlcv } from "@/lib/server/birdeye";
 import { dexStats, solPrice } from "@/lib/server/dexscreener";
+import { poolCandles, type Timeframe } from "@/lib/server/geckoterminal";
 import { holderCount } from "@/lib/server/holders";
 import { curveStates } from "@/lib/server/solana";
 import { db } from "@/lib/server/supabase";
 import { bad, isPubkey } from "@/lib/server/validate";
 
-const RANGES = {
-  "1H": { type: "1m", seconds: 3600 },
-  "1D": { type: "15m", seconds: 86_400 },
-  "1W": { type: "1H", seconds: 7 * 86_400 },
-  "1M": { type: "4H", seconds: 30 * 86_400 },
-} as const;
+const RANGES: Record<string, Timeframe> = {
+  "1H": { unit: "minute", aggregate: 1, limit: 60 },
+  "1D": { unit: "minute", aggregate: 15, limit: 96 },
+  "1W": { unit: "hour", aggregate: 1, limit: 168 },
+  "1M": { unit: "hour", aggregate: 4, limit: 180 },
+};
 
 export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]">) {
   const { mint } = await ctx.params;
   if (!isPubkey(mint)) return bad("Invalid mint");
-  const rangeKey = (new URL(request.url).searchParams.get("range") ?? "1D") as keyof typeof RANGES;
-  const range = RANGES[rangeKey] ?? RANGES["1D"];
+  const range = RANGES[new URL(request.url).searchParams.get("range") ?? "1D"] ?? RANGES["1D"];
 
   const { data: launch } = await db
     .from("pqc_launches")
@@ -27,15 +26,22 @@ export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]
     .maybeSingle();
   if (!launch) return bad("Not a pqc.market launch", 404);
 
-  // Market stats: DexScreener + Helius. Birdeye is only used for the chart candles.
-  const [stats, holders, candles, curves, sol] = await Promise.all([
+  // Stats from DexScreener + Helius; candles from GeckoTerminal for the coin's deepest pool.
+  const [stats, holders, curves, sol] = await Promise.all([
     dexStats([mint]).catch(() => ({}) as Awaited<ReturnType<typeof dexStats>>),
     holderCount(mint).catch(() => null),
-    ohlcv(mint, range.type, range.seconds).catch(() => []),
     curveStates([mint]).catch(() => ({}) as Awaited<ReturnType<typeof curveStates>>),
     solPrice().catch(() => null),
   ]);
   const d = stats[mint];
+  // candlesOk=false means the chart source failed (not "no trades"), so the page keeps what it has.
+  let candlesOk = true;
+  const candles = d?.pair
+    ? await poolCandles(d.pair, range).catch(() => {
+        candlesOk = false;
+        return [];
+      })
+    : [];
   const overview =
     d || holders !== null
       ? {
@@ -57,6 +63,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]
     identity,
     overview,
     candles,
+    candlesOk,
     curve: curves[mint] ?? null,
     solPrice: sol,
   });

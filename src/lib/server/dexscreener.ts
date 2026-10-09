@@ -37,19 +37,16 @@ export type DexStats = {
   pair: string;
 };
 
+/** Throws on failure so an empty result is never cached. */
 async function fetchPairs(addresses: string[]): Promise<Pair[]> {
-  try {
-    const res = await fetch(`${BASE}${addresses.join(",")}`, { cache: "no-store", signal: AbortSignal.timeout(8_000) });
-    if (!res.ok) {
-      if (res.status === 429) console.warn("dexscreener 429");
-      return [];
-    }
-    const json = await res.json();
-    return Array.isArray(json) ? (json as Pair[]) : [];
-  } catch (err) {
-    console.warn("dexscreener", err instanceof Error ? err.name : err);
-    return [];
+  const res = await fetch(`${BASE}${addresses.join(",")}`, { cache: "no-store", signal: AbortSignal.timeout(8_000) });
+  if (!res.ok) {
+    if (res.status === 429) console.warn("dexscreener 429");
+    throw new Error(`dexscreener ${res.status}`);
   }
+  const json = await res.json();
+  if (!Array.isArray(json)) throw new Error("dexscreener: unexpected response");
+  return json as Pair[];
 }
 
 const liq = (p: Pair) => p.liquidity?.usd ?? 0;
@@ -92,6 +89,9 @@ export async function dexStats(mints: string[]): Promise<Record<string, DexStats
       cached(`dex:${chunk.join(",")}`, 20_000, async () => {
         const best = bestPairs(await fetchPairs(chunk), new Set(chunk));
         return Object.fromEntries([...best].map(([m, p]) => [m, toStats(p)]));
+      }).catch((err) => {
+        console.warn("dexscreener", err instanceof Error ? err.message : err);
+        return {} as Record<string, DexStats>;
       }),
     ),
   );
