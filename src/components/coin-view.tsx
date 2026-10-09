@@ -7,7 +7,7 @@ import { Anchor, ArrowUpRight, Check, Fingerprint, Globe, Lock, MessageCircle, S
 import { SCHEMES, isSchemeId } from "@/lib/pq/scheme-info";
 import { verifyLaunch, type LaunchVerification } from "@/lib/pq/verify-launch";
 import type { CurveState } from "@/lib/types";
-import { ago, cn, coinPath, num, pct, price, short, usd } from "@/lib/format";
+import { ago, cn, coinPath, num, pct, price, short, usd, keepKnown } from "@/lib/format";
 import { LaunchVerificationView } from "./verify-trace";
 import { Button, CopyText, Panel, Pill, Skeleton } from "./ui";
 
@@ -85,7 +85,8 @@ export function CoinView({ mint, quantumRoute = false }: { mint: string; quantum
             retry = setTimeout(load, 5_000);
             return;
           }
-          setData(j);
+          // Keep the last known stats when a refresh comes back short (rate-limited lookups).
+          setData((prev) => (prev && prev.launch.mint === mint ? { ...j, overview: j.overview ? keepKnown(prev.overview, j.overview) : prev.overview } : j));
           setLoadedRange(range);
           const next = RANGES[RANGES.indexOf(range) + 1];
           if (autoRange && next && (j.candles?.length ?? 0) < 2) setRange(next);

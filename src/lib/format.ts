@@ -45,3 +45,15 @@ export function cn(...parts: (string | false | null | undefined)[]) {
 export function coinPath(mint: string, quantum?: boolean) {
   return quantum ? `/coin/q/${mint}` : `/coin/${mint}`;
 }
+
+/**
+ * Merges a fresh snapshot over the previous one field by field: a value the new
+ * snapshot is missing (a rate-limited lookup) keeps its last known value instead
+ * of blanking until the next refresh.
+ */
+export function keepKnown<T extends Record<string, unknown>>(prev: T | null | undefined, next: T): T {
+  if (!prev) return next;
+  const out = { ...next } as Record<string, unknown>;
+  for (const [k, v] of Object.entries(prev)) if (out[k] == null && v != null) out[k] = v;
+  return out as T;
+}

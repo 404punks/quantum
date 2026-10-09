@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Search, X } from "lucide-react";
 import type { LaunchItem, MarketItem } from "@/lib/types";
-import { cn } from "@/lib/format";
+import { cn, keepKnown } from "@/lib/format";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 import { CoinCard, CoinCardSkeleton } from "./coin-card";
 import { ProofAnimation } from "./proof-animation";
@@ -217,7 +217,12 @@ function CoinsSection() {
     for (let i = 0; i < list.length; i += 48) chunks.push(list.slice(i, i + 48));
     const load = () =>
       Promise.all(chunks.map((c) => fetch(`/api/market?mints=${c.join(",")}`).then((r) => r.json())))
-        .then((rs) => !cancelled && setMarket(Object.assign({}, ...rs.map((j) => j.tokens ?? {}))))
+        .then((rs) => {
+          if (cancelled) return;
+          const fresh: Record<string, MarketItem> = Object.assign({}, ...rs.map((j) => j.tokens ?? {}));
+          // Never blank a number that was showing just because one refresh came back short.
+          setMarket((prev) => Object.fromEntries(Object.entries(fresh).map(([mint, item]) => [mint, keepKnown(prev?.[mint], item)])));
+        })
         .catch(() => !cancelled && setMarket((m) => m ?? {}));
     void load();
     const timer = setInterval(load, 20_000);
