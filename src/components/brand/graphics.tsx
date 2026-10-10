@@ -15,6 +15,7 @@ import { PairsScene, PairsTweet } from "./pairs-graphics";
 import { RevenueScene, RevenueTweet } from "./revenue-graphics";
 import { NumbersScene, NumbersTweet } from "./stats-graphics";
 import { CoinPageScene, CoinPageTweet } from "./coinpage-graphics";
+import { PoolsScene, PoolsTweet } from "./pools-graphics";
 import { SceneAvatar, SceneBunkerMode, SceneHeader, SceneIntro, ScenePortrait, SceneProof, SceneSquare } from "./scene-graphics";
 
 /**
@@ -534,6 +535,8 @@ export function ProfilePicture() {
 export type Graphic = { id: string; title: string; note: string; w: number; h: number; group: string; Component: () => ReactNode };
 
 export const GRAPHICS: Graphic[] = [
+  { id: "pq-pools-bunker", title: "Post-quantum pools · bunker", note: "Coming soon · artwork edition", w: 1600, h: 900, group: "Post-quantum pools", Component: PoolsScene },
+  { id: "pq-pools", title: "Post-quantum pools", note: "Coming soon", w: 1600, h: 900, group: "Post-quantum pools", Component: PoolsTweet },
   { id: "token-pages-bunker", title: "Token pages, rebuilt · bunker", note: "Live quantum coin page · artwork edition", w: 1600, h: 900, group: "Token pages", Component: CoinPageScene },
   { id: "token-pages", title: "Token pages, rebuilt", note: "Live quantum coin page", w: 1600, h: 900, group: "Token pages", Component: CoinPageTweet },
   { id: "numbers-live-bunker", title: "24-hour recap · bunker", note: "Live stats · artwork edition", w: 1600, h: 900, group: "Platform stats", Component: NumbersScene },
