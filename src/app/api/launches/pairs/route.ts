@@ -1,14 +1,13 @@
 import { cached } from "@/lib/server/cache";
-import { db } from "@/lib/server/supabase";
+import { allLiveLaunches } from "@/lib/server/supabase";
 
 type PairUse = { mint: string; symbol: string; image: string | null; count: number };
 
 /** Every pair token live coins actually use, most used first, plus how many coins trade against SOL. */
 export async function GET() {
   try {
-    const result = await cached("launches:pairs:v1", 60_000, async () => {
-      const { data, error } = await db.from("pqc_launches").select("quote_mint, quote_symbol, quote_image").eq("status", "live");
-      if (error) throw new Error(error.message);
+    const result = await cached("launches:pairs:v2", 60_000, async () => {
+      const data = await allLiveLaunches<{ quote_mint: string | null; quote_symbol: string | null; quote_image: string | null }>("quote_mint, quote_symbol, quote_image");
       const byMint = new Map<string, PairUse>();
       let sol = 0;
       for (const row of data ?? []) {

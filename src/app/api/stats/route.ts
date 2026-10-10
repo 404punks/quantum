@@ -3,7 +3,7 @@ import { curveMarketCapsUsd } from "@/lib/server/curve-usd";
 import { dexStatsChecked, solPrice } from "@/lib/server/dexscreener";
 import { lastKnown } from "@/lib/server/last-known";
 import { curveStates, type CurveState } from "@/lib/server/solana";
-import { db } from "@/lib/server/supabase";
+import { db, allLiveLaunches } from "@/lib/server/supabase";
 
 /**
  * Platform-wide numbers for the brand graphics: launches, creators, the
@@ -37,8 +37,7 @@ export async function GET() {
         count("pqc_leaves"),
         count("pqc_vault_spends"),
       ]);
-      const { data: rows, error } = await db.from("pqc_launches").select("mint, creator, scheme, dev_buy_sol, launched_at").eq("status", "live");
-      if (error) throw new Error(error.message);
+      const rows = await allLiveLaunches("mint, creator, scheme, dev_buy_sol, launched_at");
       const mints = rows.map((r) => r.mint as string);
       const schemes = new Set(rows.map((r) => (r.scheme as string) || "wots"));
 

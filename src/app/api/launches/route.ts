@@ -37,6 +37,8 @@ export async function GET(request: Request) {
   }
 }
 
+const ID_PAGE = 1000;
+
 /** Throws on database errors so a failure is never cached. */
 async function list(params: URLSearchParams) {
   const q = (params.get("q") ?? "").trim().slice(0, 40);
@@ -47,7 +49,8 @@ async function list(params: URLSearchParams) {
   const offset = Math.max(0, Math.min(10_000, Number(params.get("offset")) || 0));
 
   // Narrow the candidate set first (search, creator, graduation) as newest-first mint ids.
-  let idQuery = db.from("pqc_launches").select("mint").eq("status", "live").order("launched_at", { ascending: false });
+  // Ties on launched_at are broken by mint so the pages below never overlap or skip.
+  let idQuery = db.from("pqc_launches").select("mint").eq("status", "live").order("launched_at", { ascending: false }).order("mint");
   if (q) {
     const safe = q.replace(/[%,()]/g, "");
     // Name or ticker anywhere; a contract address in full or by its first characters.
@@ -64,9 +67,15 @@ async function list(params: URLSearchParams) {
   if (pair === "sol") idQuery = idQuery.is("quote_mint", null);
   else if (pair === "token") idQuery = idQuery.not("quote_mint", "is", null);
   else if (pair && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(pair)) idQuery = idQuery.eq("quote_mint", pair);
-  const { data: ids, error: idError } = await idQuery;
-  if (idError) throw new Error(idError.message);
-  let mints = (ids ?? []).map((r) => r.mint as string);
+  // PostgREST caps a response at 1,000 rows, which silently dropped the oldest
+  // launches (including $PQC) from every list once there were more than that.
+  let mints: string[] = [];
+  for (let from = 0; ; from += ID_PAGE) {
+    const { data: ids, error: idError } = await idQuery.range(from, from + ID_PAGE - 1);
+    if (idError) throw new Error(idError.message);
+    mints.push(...(ids ?? []).map((r) => r.mint as string));
+    if (!ids || ids.length < ID_PAGE) break;
+  }
 
   if (status === "graduated") {
     const grad = new Set(await graduatedMints(mints).catch(() => [] as string[]));
