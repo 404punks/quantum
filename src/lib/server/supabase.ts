@@ -24,6 +24,21 @@ export const db: SupabaseClient = new Proxy({} as SupabaseClient, {
   },
 });
 
+/**
+ * Every live launch (the given columns), paged past PostgREST's 1,000-row cap,
+ * which otherwise silently drops rows once the platform outgrows it.
+ */
+export async function allLiveLaunches<T = Record<string, unknown>>(columns: string): Promise<T[]> {
+  const PAGE = 1000;
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db.from("pqc_launches").select(columns).eq("status", "live").order("mint").range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    out.push(...((data ?? []) as T[]));
+    if (!data || data.length < PAGE) return out;
+  }
+}
+
 export type IdentityRow = {
   id: string;
   wallet: string;

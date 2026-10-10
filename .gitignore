@@ -45,3 +45,6 @@ supabase/.temp/
 
 # Vault program handoff notes (test seeds, deploy authority): local only
 HANDOFF.md
+
+# Local buyback/burn keeper (key in .env, state and logs local): never pushed
+keeper/

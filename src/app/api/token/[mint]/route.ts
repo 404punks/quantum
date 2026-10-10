@@ -1,9 +1,10 @@
 import { ohlcv } from "@/lib/server/birdeye";
-import { cached } from "@/lib/server/cache";
+import { cached, getStored, store } from "@/lib/server/cache";
 import { curveMarketCapsUsd } from "@/lib/server/curve-usd";
-import { dexStats, solPrice } from "@/lib/server/dexscreener";
+import { dexStats, solPrice, type DexStats } from "@/lib/server/dexscreener";
 import { poolCandles, type Timeframe } from "@/lib/server/geckoterminal";
 import { holderCount } from "@/lib/server/holders";
+import { vaultHoldings } from "@/lib/server/vault-holdings";
 import { curveStates } from "@/lib/server/solana";
 import { db } from "@/lib/server/supabase";
 import { bad, isPubkey } from "@/lib/server/validate";
@@ -66,6 +67,22 @@ async function launchRow(mint: string): Promise<Record<string, unknown> | null> 
   }
 }
 
+const LAST_DEX_MS = 6 * 3600_000;
+
+/**
+ * This coin's DexScreener stats, falling back to the last good copy when the
+ * shared, rate-limited API fails, so a hiccup doesn't blank the page's numbers.
+ */
+async function coinDexStats(mint: string): Promise<DexStats | undefined> {
+  const key = `dex:last:${mint}`;
+  const fresh = (await dexStats([mint]).catch(() => null))?.[mint];
+  if (fresh?.marketCap) {
+    store(key, fresh, LAST_DEX_MS);
+    return fresh;
+  }
+  return (await getStored<DexStats>(key).catch(() => undefined)) ?? fresh;
+}
+
 export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]">) {
   const { mint } = await ctx.params;
   if (!isPubkey(mint)) return bad("Invalid mint");
@@ -75,13 +92,12 @@ export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]
   if (!launch) return bad("Not a quantum launch", 404);
 
   // Stats from DexScreener + Helius; candles from GeckoTerminal for the coin's deepest pool.
-  const [stats, holders, curves, sol] = await Promise.all([
-    dexStats([mint]).catch(() => ({}) as Awaited<ReturnType<typeof dexStats>>),
+  const [d, holders, curves, sol] = await Promise.all([
+    coinDexStats(mint),
     holderCount(mint).catch(() => null),
     curveStates([mint]).catch(() => ({}) as Awaited<ReturnType<typeof curveStates>>),
     solPrice().catch(() => null),
   ]);
-  const d = stats[mint];
   // Coins paired with a token aren't priced by data providers yet: use the curve.
   const curveUsd = d?.marketCap ? null : ((await curveMarketCapsUsd(curves, sol).catch(() => ({}) as Record<string, number>))[mint] ?? null);
   // candlesOk=false means every chart source failed (not "no trades"), so the page keeps what it has.
@@ -106,7 +122,11 @@ export async function GET(request: Request, ctx: RouteContext<"/api/token/[mint]
       : null;
 
   const { pqc_identities: identity, ...row } = launch;
+  // Quantum launches: what the dev vault holds right now.
+  const vault = typeof row.dev_vault === "string" ? await vaultHoldings(mint, row.dev_vault).catch(() => null) : null;
+
   return Response.json({
+    vault,
     launch: row,
     identity,
     overview,
